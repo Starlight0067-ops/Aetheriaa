@@ -1,0 +1,43 @@
+{
+  "mq_awakening": {
+    "title": "Echoes in the Whisperwood", "type": "main",
+    "description": "You woke beneath the old trees with no memory, only a cracked pendant that hums toward a distant light.",
+    "steps": [
+      {"id": "s1", "type": "talk",  "target": "lyra",        "text": "Find whoever is calling out on the forest road"},
+      {"id": "s2", "type": "reach", "target": "vael_harrow", "text": "Follow the road north to Vael Harrow"},
+      {"id": "s3", "type": "talk",  "target": "maren",       "text": "Speak with Elder Maren in the plaza"}
+    ],
+    "rewards": {"xp": 60, "items": {"healing_tonic": 2, "copper_coin": 30}},
+    "next": "mq_choir"
+  },
+  "mq_choir": {
+    "title": "The First Verse", "type": "main",
+    "description": "Elder Maren will let you look for answers in the Choir Steps, but only once the east road is safe.",
+    "steps": [
+      {"id": "s1", "type": "kill",     "target": "bramble_wisp",   "count": 3, "text": "Clear Bramble Wisps from the east road"},
+      {"id": "s2", "type": "reach",    "target": "choir_steps",    "text": "Climb to the Choir Steps on the eastern ridge"},
+      {"id": "s3", "type": "interact", "target": "resonance_lock", "text": "Sing open the Resonance Lock", "on_complete_flag": "sanctum_open"},
+      {"id": "s4", "type": "kill",     "target": "hollow_warden",  "count": 1, "text": "Defeat the guardian of the Hollow Sanctum"},
+      {"id": "s5", "type": "talk",     "target": "lyra",           "text": "Tell Lyra what happened in the Sanctum"}
+    ],
+    "rewards": {"xp": 250, "items": {"lantern_charm": 1, "healing_tonic": 3}, "unlock_element": "terra", "flag": "act1_complete"}
+  },
+  "sq_toma": {
+    "title": "Petals for a Price", "type": "side",
+    "description": "Toma swears there's a buyer for Sunpetals. There is always a buyer, according to Toma.",
+    "steps": [
+      {"id": "s1", "type": "collect", "target": "sunpetal", "count": 3, "text": "Gather Sunpetals in the meadows"},
+      {"id": "s2", "type": "talk",    "target": "toma",     "text": "Bring the Sunpetals to Toma"}
+    ],
+    "rewards": {"xp": 40, "items": {"honey_bread": 3, "copper_coin": 25}, "take_items": {"sunpetal": 3}}
+  },
+  "sq_ostin": {
+    "title": "The Voice in the Falls", "type": "side",
+    "description": "Brother Ostin says pilgrims hear voices at Silverfall. He wants to know if you hear them too.",
+    "steps": [
+      {"id": "s1", "type": "reach", "target": "silverfall", "text": "Visit Silverfall north of town"},
+      {"id": "s2", "type": "talk",  "target": "ostin",      "text": "Return to Brother Ostin at the chapel"}
+    ],
+    "rewards": {"xp": 50, "items": {"healing_tonic": 1}, "unlock_element": "aqua"}
+  }
+}

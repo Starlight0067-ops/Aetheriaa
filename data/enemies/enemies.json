@@ -1,0 +1,11 @@
+{
+  "bramble_wisp": {"name": "Bramble Wisp", "hp": 45, "atk": 9, "def": 1, "speed": 3.6, "detect": 13.0, "attack_range": 1.9,
+                   "windup": 0.55, "cooldown": 1.6, "xp": 14, "color": "#7BC86C", "accent": "#E9F59A", "shape": "wisp", "scale": 1.0,
+                   "drops": {"glowcap": 0.35, "copper_coin": 0.8}},
+  "rootling_brute": {"name": "Rootling Brute", "hp": 110, "atk": 16, "def": 4, "speed": 2.6, "detect": 11.0, "attack_range": 2.6,
+                   "windup": 0.9, "cooldown": 2.4, "xp": 35, "color": "#6B4E36", "accent": "#A8D46F", "shape": "brute", "scale": 1.5,
+                   "drops": {"healing_tonic": 0.5, "copper_coin": 1.0}},
+  "hollow_warden": {"name": "The Hollow Warden", "hp": 900, "atk": 24, "def": 6, "speed": 2.2, "detect": 40.0, "attack_range": 5.0,
+                   "windup": 1.2, "cooldown": 1.8, "xp": 400, "color": "#8E9AA8", "accent": "#5FE3E0", "shape": "warden", "scale": 1.0,
+                   "drops": {}}
+}

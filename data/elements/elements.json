@@ -1,0 +1,30 @@
+{
+  "elements": {
+    "pyra":   {"name": "Pyra",   "domain": "Fire",        "color": "#FF6A3D", "status": "Burning",
+               "skill": {"name": "Ember Lance",   "type": "projectile", "damage": 1.6, "speed": 22.0, "radius": 2.5, "cooldown": 4.0}},
+    "aqua":   {"name": "Aqua",   "domain": "Water",       "color": "#3DA9FF", "status": "Soaked",
+               "skill": {"name": "Tidal Ring",    "type": "aoe",        "damage": 1.2, "radius": 4.5, "cooldown": 6.0}},
+    "terra":  {"name": "Terra",  "domain": "Earth",       "color": "#C79A4B", "status": "Rooted",
+               "skill": {"name": "Stonebreak",    "type": "aoe",        "damage": 2.2, "radius": 3.5, "cooldown": 8.0}},
+    "volt":   {"name": "Volt",   "domain": "Lightning",   "color": "#B46BFF", "status": "Charged",
+               "skill": {"name": "Arc Spear",     "type": "projectile", "damage": 1.4, "speed": 36.0, "radius": 1.5, "cooldown": 3.5}},
+    "zephyr": {"name": "Zephyr", "domain": "Wind",        "color": "#5FE8B0", "status": "Lifted",
+               "skill": {"name": "Gale Step",     "type": "dash",       "damage": 1.0, "radius": 2.0, "distance": 9.0, "cooldown": 5.0}},
+    "crya":   {"name": "Crya",   "domain": "Ice",         "color": "#A8E6FF", "status": "Chilled",
+               "skill": {"name": "Frost Bloom",   "type": "aoe",        "damage": 1.1, "radius": 5.0, "cooldown": 7.0}}
+  },
+  "reactions": [
+    {"a": "aqua",   "b": "crya",  "name": "Frozen",       "multiplier": 1.2, "stun": 2.5, "color": "#CFF6FF"},
+    {"a": "pyra",   "b": "aqua",  "name": "Steam Burst",  "multiplier": 1.5, "slow": 2.0, "color": "#E8EEF2"},
+    {"a": "volt",   "b": "aqua",  "name": "Conduction",   "multiplier": 1.3, "aoe_radius": 5.0, "aoe_damage": 0.6, "color": "#9FD3FF"},
+    {"a": "zephyr", "b": "pyra",  "name": "Wildfire",     "multiplier": 1.2, "aoe_radius": 4.5, "aoe_damage": 0.8, "color": "#FFB347"},
+    {"a": "terra",  "b": "crya",  "name": "Crystallize",  "multiplier": 1.4, "slow": 3.0, "color": "#D6F0FF"},
+    {"a": "pyra",   "b": "crya",  "name": "Melt",         "multiplier": 1.8, "color": "#FF9E7A"},
+    {"a": "pyra",   "b": "volt",  "name": "Overload",     "multiplier": 1.4, "knockback": 9.0, "color": "#FF7AD9"},
+    {"a": "terra",  "b": "volt",  "name": "Fracture",     "multiplier": 1.6, "stun": 1.0, "color": "#E0B870"},
+    {"a": "zephyr", "b": "aqua",  "name": "Squall",       "multiplier": 1.1, "aoe_radius": 4.0, "aoe_damage": 0.5, "spread": true, "color": "#7FE0E0"},
+    {"a": "zephyr", "b": "crya",  "name": "Blizzard",     "multiplier": 1.1, "aoe_radius": 4.0, "aoe_damage": 0.5, "spread": true, "color": "#C8F0FF"},
+    {"a": "terra",  "b": "pyra",  "name": "Magma",        "multiplier": 1.5, "slow": 1.5, "color": "#FF8040"},
+    {"a": "terra",  "b": "aqua",  "name": "Mire",         "multiplier": 1.1, "slow": 4.0, "color": "#8A9A5B"}
+  ]
+}

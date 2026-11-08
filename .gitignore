@@ -1,0 +1,4 @@
+.godot/
+builds/
+backups/*.zip
+*.blend1

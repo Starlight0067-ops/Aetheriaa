@@ -1,0 +1,162 @@
+{
+  "npcs": {
+    "lyra":  {"name": "Lyra Vensel", "title": "Lanternwright Apprentice", "color": "#5FE8B0",
+              "dialogues": [
+                {"id": "lyra_meet",        "condition": {"quest_step": "mq_awakening:s1"}},
+                {"id": "lyra_final",       "condition": {"quest_step": "mq_choir:s5"}},
+                {"id": "lyra_after",       "condition": {"flag": "act1_complete"}},
+                {"id": "lyra_sanctum",     "condition": {"quest_step": "mq_choir:s4"}},
+                {"id": "lyra_idle",        "condition": {}}
+              ]},
+    "maren": {"name": "Elder Maren Holt", "title": "Speaker of the Concord", "color": "#C9A15B",
+              "dialogues": [
+                {"id": "maren_meet",       "condition": {"quest_step": "mq_awakening:s3"}},
+                {"id": "maren_wisps",      "condition": {"quest_step": "mq_choir:s1"}},
+                {"id": "maren_after",      "condition": {"flag": "act1_complete"}},
+                {"id": "maren_busy",       "condition": {"quest_active": "mq_choir"}},
+                {"id": "maren_stranger",   "condition": {}}
+              ]},
+    "ostin": {"name": "Brother Ostin", "title": "Priest of the Quiet Bell", "color": "#9AA7D9",
+              "dialogues": [
+                {"id": "ostin_return",     "condition": {"quest_step": "sq_ostin:s2"}},
+                {"id": "ostin_waiting",    "condition": {"quest_active": "sq_ostin"}},
+                {"id": "ostin_done",       "condition": {"quest_done": "sq_ostin"}},
+                {"id": "ostin_offer",      "condition": {}}
+              ]},
+    "toma":  {"name": "Toma", "title": "Messenger (Self-Appointed)", "color": "#E39A5A",
+              "dialogues": [
+                {"id": "toma_turnin",      "condition": {"quest_step": "sq_toma:s2"}},
+                {"id": "toma_waiting",     "condition": {"quest_active": "sq_toma"}},
+                {"id": "toma_done",        "condition": {"quest_done": "sq_toma"}},
+                {"id": "toma_offer",       "condition": {}}
+              ]},
+    "hesk":  {"name": "Hesk", "title": "Blacksmith", "color": "#B5654A",
+              "dialogues": [ {"id": "hesk_talk", "condition": {}} ]},
+    "wenna": {"name": "Wenna", "title": "Keeper of the Gilded Kettle", "color": "#E8B65A",
+              "dialogues": [
+                {"id": "wenna_gift",       "condition": {"not_flag": "wenna_gift"}},
+                {"id": "wenna_talk",       "condition": {}}
+              ]}
+  },
+  "dialogues": {
+    "lyra_meet": {"nodes": {
+      "start": {"speaker": "lyra", "text": "Hello? Oh, thank the stars, a person! Did you see the light from the Core last night? Everyone in town says it's impossible.", "next": "n2"},
+      "n2": {"speaker": "lyra", "text": "Wait. You're shaking. And that pendant is glowing. Are you all right?", "choices": [
+        {"text": "I don't remember anything. Not even how I got here.", "next": "n3a"},
+        {"text": "I'm fine. What is the Core?", "next": "n3b"}
+      ]},
+      "n3a": {"speaker": "lyra", "text": "Nothing at all? That's terrifying. And, I'm sorry, also incredibly interesting. I'm Lyra. Lanternwright apprentice.", "next": "n4"},
+      "n3b": {"speaker": "lyra", "text": "The Elyndra Core. That giant spire on the ridge. It's been dead for six hundred years, and last night it flickered. I'm Lyra, by the way.", "next": "n4"},
+      "n4": {"speaker": "lyra", "text": "Hold still. Your pendant is singing. Can you hear it? It sounds like wind through a bell.", "next": "n5"},
+      "n5": {"speaker": "narrator", "text": "A cool current rushes through you. The air around your hands begins to move. You can hear Zephyr.", "actions": [{"unlock_element": "zephyr"}], "next": "n6"},
+      "n6": {"speaker": "lyra", "text": "You're a Resonant! Two tones at once, though? That shouldn't be possible. Come on, Elder Maren needs to see this. Vael Harrow is just up the road.", "end": true}
+    }},
+    "lyra_sanctum": {"nodes": {
+      "start": {"speaker": "lyra", "text": "The Sanctum door is open. I can feel it humming from here. Whatever is inside has been waiting a very long time.", "next": "n2"},
+      "n2": {"speaker": "lyra", "text": "Keep your elements close. Fire to break its guard, wind to stay out of reach. And please don't die. I'd have to write that up.", "end": true}
+    }},
+    "lyra_final": {"nodes": {
+      "start": {"speaker": "lyra", "text": "You're back! The Core is brighter. You can see it from the plaza. What happened in there?", "choices": [
+        {"text": "The guardian fell. Its heart was singing the same note as my pendant.", "next": "n2"},
+        {"text": "Something in there knew me.", "next": "n2"}
+      ]},
+      "n2": {"speaker": "lyra", "text": "Then the Choir records were right. The Cores aren't dead. They're asleep, and you're waking them.", "next": "n3"},
+      "n3": {"speaker": "narrator", "text": "Far up on the ridge, the Elyndra Core pulses once. Somewhere a voice you have never heard says, \"Every light you kindle, something else must pay for.\"", "next": "n4"},
+      "n4": {"speaker": "lyra", "text": "Did you hear that too? Okay. Okay. We'll figure it out together. Here, take my charm. Lanternwrights look after their own.", "end": true}
+    }},
+    "lyra_after": {"nodes": {
+      "start": {"speaker": "lyra", "text": "I've filled half a journal on you already. Auralis has Choir ruins on the coast. When you're ready, I want to see them.", "end": true}
+    }},
+    "lyra_idle": {"nodes": {
+      "start": {"speaker": "lyra", "text": "Did you know the Old Span is older than the town? Someone built a bridge to nowhere, and the town grew around it. Sorry. I do this.", "end": true}
+    }},
+    "maren_meet": {"nodes": {
+      "start": {"speaker": "maren", "text": "So you're the one Lyra won't stop talking about. You don't look like a portent.", "next": "n2"},
+      "n2": {"speaker": "maren", "text": "Two Resonances, no memory, waking the same night the Core stirs. I don't believe in coincidence.", "choices": [
+        {"text": "I want answers as much as you do.", "next": "n3"},
+        {"text": "I'm not a threat to your town.", "next": "n3b"}
+      ]},
+      "n3": {"speaker": "maren", "text": "Good. Then we want the same thing.", "next": "n4"},
+      "n3b": {"speaker": "maren", "text": "We'll see. I've buried enough people who meant no harm.", "next": "n4"},
+      "n4": {"speaker": "maren", "text": "The Choir Steps on the eastern ridge are closest to the Core. Bramble Wisps have been swarming the east road since last night. Clear them, and I'll let you go up.", "end": true}
+    }},
+    "maren_wisps": {"nodes": {
+      "start": {"speaker": "maren", "text": "The wisps are thickest past the last farmhouse on the east road. Strike while they wind up. They telegraph like drunk sailors.", "end": true}
+    }},
+    "maren_busy": {"nodes": {
+      "start": {"speaker": "maren", "text": "The Choir Steps are yours to search. Bring me back something more useful than rumours.", "end": true}
+    }},
+    "maren_after": {"nodes": {
+      "start": {"speaker": "maren", "text": "The Core is brighter, and the Quiet Bell is ringing warnings. You've made my life complicated, stranger. Thank you, I think.", "end": true}
+    }},
+    "maren_stranger": {"nodes": {
+      "start": {"speaker": "maren", "text": "Vael Harrow welcomes travelers who keep the peace. Keep it.", "end": true}
+    }},
+    "ostin_offer": {"nodes": {
+      "start": {"speaker": "ostin", "text": "Peace to you. \"What is silent cannot be broken.\" Though lately the silence has been very loud.", "next": "n2"},
+      "n2": {"speaker": "ostin", "text": "Pilgrims say they hear voices in the spray at Silverfall. I'm too old for the climb. Would you go, and tell me honestly what you hear?", "choices": [
+        {"text": "I'll go.", "next": "yes"},
+        {"text": "Not now.", "next": "no"}
+      ]},
+      "yes": {"speaker": "ostin", "text": "Bless you. Follow the lake road north from the west bank.", "actions": [{"start_quest": "sq_ostin"}], "end": true},
+      "no": {"speaker": "ostin", "text": "The falls will wait. They have waited six hundred years.", "end": true}
+    }},
+    "ostin_waiting": {"nodes": {
+      "start": {"speaker": "ostin", "text": "Silverfall lies past the lake. Mind the slippery stones.", "end": true}
+    }},
+    "ostin_return": {"nodes": {
+      "start": {"speaker": "ostin", "text": "You're soaked to the bone. And there's something in your eyes. What did you hear?", "choices": [
+        {"text": "Voices. Singing. And water answering me.", "next": "n2"},
+        {"text": "Just the falls.", "next": "n2b"}
+      ]},
+      "n2": {"speaker": "ostin", "text": "Then the Resonance answers you. I pray it is mercy and not a test.", "next": "n3"},
+      "n2b": {"speaker": "ostin", "text": "Your hands are dripping, child, and the water isn't falling. Don't lie to a priest.", "next": "n3"},
+      "n3": {"speaker": "narrator", "text": "Cold clarity floods your chest. You can hear Aqua.", "end": true}
+    }},
+    "ostin_done": {"nodes": {
+      "start": {"speaker": "ostin", "text": "Whatever you are, I'll pray for you. Even if the Bell would rather I didn't.", "end": true}
+    }},
+    "toma_offer": {"nodes": {
+      "start": {"speaker": "toma", "text": "Psst. You're new. New means you don't know the prices yet, which is great for me.", "next": "n2"},
+      "n2": {"speaker": "toma", "text": "I've got a buyer for Sunpetals, the gold flowers in the meadows south of town. Bring me three and I'll split the profit. Mostly fairly.", "choices": [
+        {"text": "Deal.", "next": "yes"},
+        {"text": "Mostly fairly?", "next": "why"}
+      ]},
+      "why": {"speaker": "toma", "text": "Sixty-forty. Fifty-fifty if you stop asking questions. Deal?", "choices": [
+        {"text": "Fine. Deal.", "next": "yes"},
+        {"text": "Maybe later.", "next": "no"}
+      ]},
+      "yes": {"speaker": "toma", "text": "Knew you were smart. Three Sunpetals. Don't eat them, they're gross.", "actions": [{"start_quest": "sq_toma"}], "end": true},
+      "no": {"speaker": "toma", "text": "Your loss. Offer expires never.", "end": true}
+    }},
+    "toma_waiting": {"nodes": {
+      "start": {"speaker": "toma", "text": "Sunpetals grow where it's sunny. I know, shocking. South meadows.", "end": true}
+    }},
+    "toma_turnin": {"nodes": {
+      "start": {"speaker": "toma", "text": "Ooh, look at those. Perfect petals. My buyer will weep.", "next": "n2"},
+      "n2": {"speaker": "toma", "text": "Here's your cut, and some bread I definitely paid for. Pleasure doing business, partner.", "end": true}
+    }},
+    "toma_done": {"nodes": {
+      "start": {"speaker": "toma", "text": "Partner! If you hear of anything shiny and unguarded, you know where I live. Everywhere.", "end": true}
+    }},
+    "hesk_talk": {"nodes": {
+      "start": {"speaker": "hesk", "text": "That blade of yours, let me see. Hm. Good steel, but the folding pattern... nobody's forged like that in centuries.", "next": "n2"},
+      "n2": {"speaker": "hesk", "text": "If you find Riverstone, bring it by sometime. Makes a fine whetstone.", "end": true}
+    }},
+    "wenna_gift": {"nodes": {
+      "start": {"speaker": "wenna", "text": "You look like you haven't eaten since the Silence. Sit. No? Then take this for the road.", "actions": [{"give_item": "honey_bread:2"}, {"flag": "wenna_gift"}], "end": true}
+    }},
+    "wenna_talk": {"nodes": {
+      "start": {"speaker": "wenna", "text": "Half the town's at my tables arguing about the Core. Best week for business I've had in years.", "end": true}
+    }}
+  },
+  "signs": {
+    "sign_harrow":   "VAEL HARROW. Est. 41 AS. Keep the peace of the Concord.",
+    "sign_east":     "East Road. Choir Steps, 1 league. Travelers beware of wisps.",
+    "sign_lake":     "Lake Mirelle and Silverfall. Pilgrims, mind the stones.",
+    "sign_forest":   "Whisperwood. Do not leave the road after dark.",
+    "sign_ruins":    "Carved in an old script, half worn away: \"...SEVEN VOICES HELD THE SKY... THE SEVENTH SANG ALONE...\"",
+    "sign_brazier":  "Three bowls of old bronze surround a sealed door. The carving shows flames rising into a single star.",
+    "sign_overlook": "From here the whole Green Frontier is visible: the town, the lake, and the dead Core on the ridge. It isn't quite dead anymore."
+  }
+}
