@@ -1,0 +1,14 @@
+{
+  "generated": "2026-11-08T03:43:49.783Z",
+  "vrm": {},
+  "glb": {},
+  "legacy": {
+    "hesk": "/assets/characters/legacy/hesk.glb",
+    "kael": "/assets/characters/legacy/kael.glb",
+    "lyra": "/assets/characters/legacy/lyra.glb",
+    "maren": "/assets/characters/legacy/maren.glb",
+    "ostin": "/assets/characters/legacy/ostin.glb",
+    "toma": "/assets/characters/legacy/toma.glb",
+    "wenna": "/assets/characters/legacy/wenna.glb"
+  }
+}
