@@ -14,7 +14,7 @@ var data := {
 
 ## Presets are tuned for the Celeron N5095 / Intel UHD dev machine (low = default).
 const PRESETS := {
-	"low":    {"scale": 0.8,  "shadows": true,  "shadow_dist": 35.0, "fog": true, "glow": false, "fxaa": false, "view": 260.0, "grass": 0.5, "msaa": 0},
+	"low":    {"scale": 0.75, "shadows": true,  "shadow_dist": 32.0, "fog": true, "glow": false, "fxaa": false, "view": 260.0, "grass": 0.5, "msaa": 0},
 	"medium": {"scale": 1.0,  "shadows": true,  "shadow_dist": 60.0, "fog": true, "glow": true,  "fxaa": true,  "view": 360.0, "grass": 0.8, "msaa": 0},
 	"high":   {"scale": 1.0,  "shadows": true,  "shadow_dist": 90.0, "fog": true, "glow": true,  "fxaa": false, "view": 480.0, "grass": 1.0, "msaa": 2},
 }

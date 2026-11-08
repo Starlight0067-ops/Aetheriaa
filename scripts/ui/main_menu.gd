@@ -16,6 +16,9 @@ func _ready() -> void:
 	_build_background()
 	_build_ui()
 	Sfx.play_music("music_menu")
+	if "--smoke-test" in OS.get_cmdline_user_args():
+		print("SMOKE: main menu loaded")
+		_new_game()
 
 
 func _build_background() -> void:

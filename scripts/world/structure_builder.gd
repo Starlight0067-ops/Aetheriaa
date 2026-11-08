@@ -46,11 +46,14 @@ static func building(parent: Node3D, name: String, pos2: Vector2, rot_y: float, 
 	var roof := Color(o.get("roof_col", ROOFS[0]))
 	var k := MeshKit.new()
 	var body_h := floors * fh + 0.4
+	k.alpha = 0.4
 	k.box(Vector3(0, 0.35, 0), Vector3(w + 0.4, 0.7, d + 0.4), STONE.darkened(0.1))   # plinth
+	k.alpha = 0.6
 	k.box(Vector3(0, body_h * 0.5 + 0.3, 0), Vector3(w, body_h, d), wall)
 	if floors > 1:   # jettied upper floor
 		k.box(Vector3(0, fh + 0.5 + (body_h - fh) * 0.5, 0), Vector3(w + 0.5, body_h - fh, d + 0.5), wall)
 		k.box(Vector3(0, fh + 0.45, 0), Vector3(w + 0.7, 0.2, d + 0.7), TIMBER)
+	k.alpha = 0.2
 	if o.get("timber", true):
 		for sx in [-1.0, 1.0]:
 			for sz in [-1.0, 1.0]:
@@ -60,6 +63,7 @@ static func building(parent: Node3D, name: String, pos2: Vector2, rot_y: float, 
 	# door (front = +Z)
 	k.box(Vector3(0, 1.4, d * 0.5 + 0.06), Vector3(1.3, 2.2, 0.12), Color("#5A3A26"))
 	k.box(Vector3(0, 2.6, d * 0.5 + 0.1), Vector3(1.6, 0.2, 0.2), TIMBER)
+	k.alpha = 1.0
 	# windows
 	var win := Color("#2E4A6A")
 	var frame := Color("#F4EEDC")
@@ -77,6 +81,7 @@ static func building(parent: Node3D, name: String, pos2: Vector2, rot_y: float, 
 			k.box(Vector3(w * 0.5 + 0.05, wy, wz), Vector3(0.1, 1.1, 0.9), win)
 			k.box(Vector3(-w * 0.5 - 0.05, wy, wz), Vector3(0.1, 1.1, 0.9), win)
 	# roof
+	k.alpha = 0.8
 	var top := body_h + 0.3
 	match o.get("roof", "gable"):
 		"gable", "steep":
@@ -87,8 +92,10 @@ static func building(parent: Node3D, name: String, pos2: Vector2, rot_y: float, 
 				k.prism(Vector3(0, top + rh * 0.5, 0), Vector3(d + 1.2, rh, w + 1.0), roof, PI / 2.0)
 		"hip":
 			k.cyl(Vector3(0, top + 1.3, 0), 0.3, max(w, d) * 0.78, 2.6, roof, 4, Basis(Vector3.UP, PI / 4.0))
+	k.alpha = 0.4
 	if o.get("chimney", false):
 		k.box(Vector3(w * 0.3, top + 2.2, -d * 0.2), Vector3(0.8, 2.6, 0.8), STONE.darkened(0.2))
+	k.alpha = 1.0
 	if o.has("awning"):
 		var ac := Color(o.awning)
 		k.box(Vector3(0, 2.9, d * 0.5 + 0.9), Vector3(w * 0.8, 0.12, 1.8), ac, 0.0)
@@ -97,6 +104,7 @@ static func building(parent: Node3D, name: String, pos2: Vector2, rot_y: float, 
 	if o.has("sign"):
 		k.box(Vector3(w * 0.5 + 0.6, 3.0, d * 0.5 - 0.3), Vector3(1.0, 0.08, 0.08), TIMBER)
 		k.box(Vector3(w * 0.5 + 0.9, 2.55, d * 0.5 - 0.3), Vector3(0.9, 0.7, 0.08), Color(o.sign))
+	k.alpha = 0.2
 	if o.get("balcony", false) and floors > 1:
 		k.box(Vector3(0, fh + 0.6, d * 0.5 + 0.9), Vector3(w * 0.6, 0.15, 1.4), TIMBER)
 		k.box(Vector3(0, fh + 1.1, d * 0.5 + 1.55), Vector3(w * 0.6, 0.8, 0.08), TIMBER)
@@ -112,8 +120,11 @@ static func build_town(parent: Node3D) -> void:
 	# Town hall with clock tower, north side of plaza, facing south (+Z)
 	var hall := building(town, "TownHall", Vector2(10, -17), 0.0, {"w": 12.0, "d": 8.0, "floors": 2, "roof": "gable", "wall": "#F2EBDD", "roof_col": "#4E5D78", "balcony": true})
 	var tk := MeshKit.new()
+	tk.alpha = 0.6
 	tk.box(Vector3(0, 9.0, -1.0), Vector3(3.2, 6.0, 3.2), Color("#E8D5B0"))
+	tk.alpha = 0.8
 	tk.cyl(Vector3(0, 13.6, -1.0), 0.0, 2.6, 3.4, Color("#3F4D66"), 4, Basis(Vector3.UP, PI / 4.0))
+	tk.alpha = 1.0
 	tk.cyl(Vector3(0, 10.0, 0.62), 0.9, 0.9, 0.1, Color("#F7F1DE"), 16, Basis(Vector3.RIGHT, PI / 2.0))
 	tk.box(Vector3(0, 10.2, 0.7), Vector3(0.08, 0.7, 0.05), Color("#333333"))
 	tk.box(Vector3(0.25, 10.0, 0.7), Vector3(0.5, 0.08, 0.05), Color("#333333"))
@@ -133,7 +144,9 @@ static func build_town(parent: Node3D) -> void:
 	# Chapel of the Quiet Bell (west bank, north)
 	var chapel := building(town, "Chapel", Vector2(-27, -20), PI / 2.0, {"w": 6.0, "d": 10.0, "floors": 1, "roof": "steep", "wall": "#F2EBDD", "roof_col": "#4E5D78", "timber": false})
 	var ck := MeshKit.new()
+	ck.alpha = 0.6
 	ck.box(Vector3(0, 6.0, -6.0), Vector3(2.4, 8.0, 2.4), Color("#F2EBDD"))
+	ck.alpha = 0.8
 	ck.cyl(Vector3(0, 11.5, -6.0), 0.0, 1.9, 3.0, Color("#4E5D78"), 4, Basis(Vector3.UP, PI / 4.0))
 	ck.cyl(Vector3(0, 8.6, -6.0), 0.35, 0.6, 0.9, Color("#C9A15B"), 8)
 	ck.instance(chapel, "BellTower")
@@ -166,12 +179,14 @@ static func build_town(parent: Node3D) -> void:
 static func _plaza(parent: Node3D) -> void:
 	var y := _ground(L.PLAZA.x, L.PLAZA.y)
 	var k := MeshKit.new()
+	k.alpha = 0.4
 	# dry Choir fountain
 	k.cyl(Vector3(0, 0.35, 0), 3.2, 3.4, 0.7, STONE, 12)
 	k.cyl(Vector3(0, 0.72, 0), 2.7, 2.7, 0.1, Color("#9E9480"), 12)
 	k.cyl(Vector3(0, 1.8, 0), 0.35, 0.5, 2.4, CHOIR, 6)
 	k.cyl(Vector3(0, 3.3, 0), 0.0, 0.45, 0.9, CHOIR, 6)
 	k.sphere(Vector3(0, 3.0, 0), Vector3(0.5, 0.5, 0.5), Color("#5FE3E0"), 6, true)
+	k.alpha = 0.2
 	# benches & planters
 	for a in [0.4, 1.9, 3.5, 5.0]:
 		var p := Vector3(cos(a) * 7.0, 0, sin(a) * 7.0)
@@ -182,6 +197,7 @@ static func _plaza(parent: Node3D) -> void:
 		k.cyl(p + Vector3(0, 0.4, 0), 0.7, 0.6, 0.8, STONE.darkened(0.1), 8)
 		k.sphere(p + Vector3(0, 1.0, 0), Vector3(1.2, 0.8, 1.2), Color("#5DAE4E"), 7)
 		k.sphere(p + Vector3(0.2, 1.3, 0.1), Vector3(0.3, 0.3, 0.3), Color("#FF8FB1"), 5)
+	k.alpha = 0.2
 	# market stalls
 	for s in [[Vector3(-5, 0, 6.5), "#D9534F"], [Vector3(4, 0, 7.5), "#5FA8D3"], [Vector3(-6, 0, -6), "#E2B95B"]]:
 		var sp: Vector3 = s[0]
@@ -200,6 +216,7 @@ static func _bridge(parent: Node3D) -> void:
 	var rx := L.river_x(0.0)
 	var y := 2.9
 	var k := MeshKit.new()
+	k.alpha = 0.4
 	k.box(Vector3(0, y, 0), Vector3(18.0, 0.5, 4.0), STONE)
 	for side in [-1.0, 1.0]:
 		k.box(Vector3(0, y + 0.55, side * 1.9), Vector3(18.0, 0.6, 0.3), STONE.darkened(0.08))

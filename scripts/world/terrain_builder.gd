@@ -4,6 +4,8 @@ extends RefCounted
 
 const L = preload("res://scripts/world/elyndra_layout.gd")
 
+static var height_tex: ImageTexture
+
 
 static func build_terrain(parent: Node3D) -> void:
 	var n := int(L.HALF * 2.0 / L.STEP) + 1
@@ -13,6 +15,9 @@ static func build_terrain(parent: Node3D) -> void:
 		for xi in n:
 			heights[zi * n + xi] = L.height(-L.HALF + xi * L.STEP, -L.HALF + zi * L.STEP)
 
+	var himg := Image.create_from_data(n, n, false, Image.FORMAT_RF, heights.to_byte_array())
+	himg.convert(Image.FORMAT_RH)   # R16F: linear filtering is guaranteed on every Vulkan GPU (R32F is not)
+	height_tex = ImageTexture.create_from_image(himg)
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	for zi in n:
@@ -33,7 +38,7 @@ static func build_terrain(parent: Node3D) -> void:
 			st.add_index(i); st.add_index(i + 1); st.add_index(i + n)
 			st.add_index(i + 1); st.add_index(i + n + 1); st.add_index(i + n)
 	var mesh := st.commit()
-	mesh.surface_set_material(0, MeshKit.mat("terrain"))
+	mesh.surface_set_material(0, StyleMats.terrain())
 	var mi := MeshInstance3D.new()
 	mi.name = "TerrainMesh"
 	mi.mesh = mesh
@@ -60,29 +65,7 @@ static func build_terrain(parent: Node3D) -> void:
 
 
 static func build_water(parent: Node3D) -> void:
-	var shader := Shader.new()
-	shader.code = """
-shader_type spatial;
-render_mode cull_disabled, depth_draw_always;
-uniform vec4 shallow : source_color = vec4(0.36, 0.78, 0.92, 0.72);
-uniform vec4 deep : source_color = vec4(0.10, 0.38, 0.72, 0.9);
-varying vec3 wpos;
-void vertex() {
-	wpos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
-	VERTEX.y += sin(wpos.x * 0.35 + TIME * 1.1) * 0.06 + cos(wpos.z * 0.28 + TIME * 0.9) * 0.06;
-}
-void fragment() {
-	float fres = pow(1.0 - clamp(dot(NORMAL, VIEW), 0.0, 1.0), 3.0);
-	float r = sin(wpos.x * 1.7 + TIME * 1.6) * sin(wpos.z * 1.3 - TIME * 1.2);
-	float sparkle = smoothstep(0.92, 1.0, r);
-	ALBEDO = mix(shallow.rgb, deep.rgb, 0.45 + 0.3 * fres) + vec3(sparkle * 0.35);
-	ALPHA = mix(shallow.a, deep.a, fres);
-	ROUGHNESS = 0.06;
-	SPECULAR = 0.7;
-}
-"""
-	var m := ShaderMaterial.new()
-	m.shader = shader
+	var m := StyleMats.water(height_tex, L.HALF, L.WATER_Y)
 	var plane := PlaneMesh.new()
 	plane.size = Vector2(130, 230)
 	plane.subdivide_width = 26
@@ -152,35 +135,63 @@ void fragment() {
 static func _tree_meshes() -> Dictionary:
 	var trunk := Color("#7A5236")
 	var oak := MeshKit.new()
-	oak.cyl(Vector3(0, 1.4, 0), 0.22, 0.32, 2.8, trunk, 6)
-	oak.sphere(Vector3(0, 3.6, 0), Vector3(3.4, 2.8, 3.4), Color("#4E9A45"), 8)
-	oak.sphere(Vector3(0.9, 3.0, 0.4), Vector3(2.2, 1.9, 2.2), Color("#5DAE4E"), 7)
-	oak.sphere(Vector3(-0.8, 3.2, -0.5), Vector3(2.2, 2.0, 2.2), Color("#438C3F"), 7)
+	oak.cyl(Vector3(0, 1.4, 0), 0.2, 0.34, 2.8, trunk, 7)
+	oak.cyl(Vector3(0.35, 2.5, 0), 0.06, 0.12, 1.2, trunk, 5, Basis(Vector3.BACK, -0.7))
+	for b in [[0, 3.5, 0, 3.6, 2.6, "#3F8E44"], [1.1, 3.1, 0.5, 2.4, 2.0, "#4C9E4C"], [-1.0, 3.3, -0.6, 2.5, 2.1, "#37803F"],
+			[0.3, 4.5, -0.3, 2.6, 2.0, "#5DB55A"], [-0.6, 4.1, 0.8, 2.0, 1.7, "#55AA52"], [0.8, 4.0, -0.9, 1.9, 1.6, "#4A9A4A"]]:
+		oak.sphere(Vector3(b[0], b[1], b[2]), Vector3(b[3], b[4], b[3]), Color(b[5]), 9)
 	var pine := MeshKit.new()
-	pine.cyl(Vector3(0, 1.0, 0), 0.16, 0.26, 2.0, trunk, 6)
-	pine.cyl(Vector3(0, 2.6, 0), 0.0, 1.8, 2.6, Color("#2F6B3E"), 7)
-	pine.cyl(Vector3(0, 3.9, 0), 0.0, 1.4, 2.2, Color("#357746"), 7)
-	pine.cyl(Vector3(0, 5.0, 0), 0.0, 0.9, 1.8, Color("#3B8250"), 7)
-	var lantern := MeshKit.new()   # "Lanternleaf": pale trunk, tall teal-tinted crown
-	lantern.cyl(Vector3(0, 2.0, 0), 0.12, 0.2, 4.0, Color("#E6E1D3"), 6)
-	lantern.sphere(Vector3(0, 4.8, 0), Vector3(2.0, 3.4, 2.0), Color("#6CC48F"), 8)
-	lantern.sphere(Vector3(0.3, 6.2, 0.2), Vector3(1.2, 1.6, 1.2), Color("#86D9A4"), 6)
+	pine.cyl(Vector3(0, 1.0, 0), 0.14, 0.26, 2.0, trunk, 6)
+	for t in [[2.2, 2.0, 2.4, "#2C6440"], [3.4, 1.65, 2.2, "#327049"], [4.5, 1.3, 2.0, "#397C50"], [5.5, 0.95, 1.7, "#418858"], [6.4, 0.55, 1.3, "#4A935F"]]:
+		pine.cyl(Vector3(0, t[0], 0), 0.0, t[1], t[2], Color(t[3]), 8)
+	var lantern := MeshKit.new()   # "Lanternleaf": pale trunk, teal crown, glowing seed-lanterns
+	lantern.glow_color = Color("#FFE7A0")
+	lantern.cyl(Vector3(0, 2.0, 0), 0.11, 0.2, 4.0, Color("#E6E1D3"), 6)
+	lantern.sphere(Vector3(0, 4.7, 0), Vector3(2.2, 3.2, 2.2), Color("#5FBF8E"), 9)
+	lantern.sphere(Vector3(0.4, 6.0, 0.2), Vector3(1.5, 1.8, 1.5), Color("#7CD6A0"), 8)
+	lantern.sphere(Vector3(-0.5, 5.4, -0.4), Vector3(1.3, 1.5, 1.3), Color("#6ACB96"), 7)
+	for i in 5:
+		var a := i * TAU / 5.0
+		lantern.sphere(Vector3(cos(a) * 1.0, 3.6 + (i % 2) * 0.5, sin(a) * 1.0), Vector3(0.22, 0.3, 0.22), Color("#FFE7A0"), 6, true)
 	var bush := MeshKit.new()
-	bush.sphere(Vector3(0, 0.5, 0), Vector3(1.6, 1.1, 1.6), Color("#4F9C49"), 7)
-	bush.sphere(Vector3(0.5, 0.45, 0.3), Vector3(1.0, 0.8, 1.0), Color("#5DAE4E"), 6)
+	bush.sphere(Vector3(0, 0.5, 0), Vector3(1.6, 1.1, 1.6), Color("#468F45"), 8)
+	bush.sphere(Vector3(0.5, 0.55, 0.3), Vector3(1.1, 0.9, 1.1), Color("#57A651"), 7)
+	bush.sphere(Vector3(-0.4, 0.75, -0.2), Vector3(0.9, 0.8, 0.9), Color("#62B35A"), 7)
+	var petals := ["#FF8FB1", "#FFFFFF", "#FFD34D", "#FF8FB1"]
+	for i in 4:
+		var a := i * 1.7
+		bush.sphere(Vector3(cos(a) * 0.6, 0.9 + (i % 2) * 0.2, sin(a) * 0.6), Vector3(0.14, 0.14, 0.14), Color(petals[i]), 5)
 	var rock := MeshKit.new()
 	rock.sphere(Vector3(0, 0.3, 0), Vector3(1.6, 1.1, 1.3), Color("#9A958C"), 6)
 	rock.sphere(Vector3(0.4, 0.55, 0.1), Vector3(0.9, 0.8, 0.9), Color("#A8A399"), 5)
-	var grass := MeshKit.new()
-	for i in 4:
-		var a := i * PI / 2.0 + 0.4
-		var b := Basis(Vector3(cos(a), 0, sin(a)), 0.25)
-		grass.cyl(Vector3(cos(a) * 0.08, 0.22, sin(a) * 0.08), 0.0, 0.05, 0.45, Color("#7CC860"), 3, b)
+	rock.sphere(Vector3(-0.3, 0.75, -0.1), Vector3(0.7, 0.25, 0.6), Color("#6FA35A"), 5)
+	# grass tuft: 6 single-triangle blades, dark root -> bright tip
+	var gst := SurfaceTool.new()
+	gst.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var grng := RandomNumberGenerator.new()
+	grng.seed = 11
+	for i in 6:
+		var a := grng.randf() * TAU
+		var r := grng.randf_range(0.0, 0.12)
+		var base := Vector3(cos(a) * r, 0, sin(a) * r)
+		var side := Vector3(-sin(a), 0, cos(a)) * 0.035
+		var h := grng.randf_range(0.32, 0.55)
+		var lean := Vector3(cos(a), 0, sin(a)) * grng.randf_range(0.04, 0.14)
+		for v in [[base - side, Color("#3E7F3A")], [base + side, Color("#3E7F3A")], [base + lean + Vector3(0, h, 0), Color("#B5E07A")]]:
+			gst.set_color(v[1])
+			gst.set_normal(Vector3.UP)
+			gst.add_vertex(v[0])
+	var grass := gst.commit()
 	var flower := MeshKit.new()
 	flower.cyl(Vector3(0, 0.15, 0), 0.015, 0.015, 0.3, Color("#4E9A45"), 3)
-	flower.sphere(Vector3(0, 0.32, 0), Vector3(0.14, 0.08, 0.14), Color.WHITE, 5)
-	return {"oak": oak.build(), "pine": pine.build(), "lantern": lantern.build(), "bush": bush.build(),
-		"rock": rock.build(), "grass": grass.build(), "flower": flower.build()}
+	flower.sphere(Vector3(0, 0.32, 0), Vector3(0.16, 0.07, 0.16), Color.WHITE, 6)
+	flower.sphere(Vector3(0, 0.35, 0), Vector3(0.06, 0.05, 0.06), Color("#FFE27A"), 4)
+	var out := {"oak": oak.build(), "pine": pine.build(), "lantern": lantern.build(), "bush": bush.build(),
+		"rock": rock.build(), "grass": grass, "flower": flower.build()}
+	for k in ["oak", "pine", "lantern"]:
+		out[k].surface_set_material(0, StyleMats.foliage("tree"))
+	out.bush.surface_set_material(0, StyleMats.foliage("bush"))
+	return out
 
 
 ## Designed vegetation: each zone is authored with a density, species mix and
@@ -248,9 +259,11 @@ static func build_vegetation(parent: Node3D, grass_density: float) -> Array:
 	# grass tufts & flowers (short visibility range, chunked)
 	var tufts: Array = []
 	var flowers: Array = []
-	var tuft_count := int(4500 * grass_density)
+	var tuft_count := int(10000 * grass_density)
 	for i in tuft_count:
 		var p := Vector2(rng.randf_range(-100, 100), rng.randf_range(-100, 100))
+		if i % 2 == 0:
+			p = Vector2(rng.randf_range(-70, 60), rng.randf_range(-60, 90))
 		if L.road_distance(p.x, p.y) < 2.2 or L.is_water(p.x, p.y): continue
 		if Vector2(p.x, p.y).distance_to(L.PLAZA) < 11.0: continue
 		var h := L.height(p.x, p.y)
@@ -262,17 +275,16 @@ static func build_vegetation(parent: Node3D, grass_density: float) -> Array:
 			p = Vector2(rng.randf_range(-70, -25), rng.randf_range(-70, -40))
 		if L.road_distance(p.x, p.y) < 2.0 or L.is_water(p.x, p.y): continue
 		flowers.append(Vector3(p.x, L.height(p.x, p.y), p.y))
-	_chunked_multimesh(parent, meshes.grass, tufts, rng, "grass", 45.0, 0.15, Vector2(0.7, 1.4))
-	_chunked_multimesh(parent, meshes.flower, flowers, rng, "flower", 55.0, 0.0, Vector2(0.8, 1.3), true)
+	_chunked_multimesh(parent, meshes.grass, tufts, rng, "grass", 34.0, 0.12, Vector2(0.8, 1.6), false, 20.0)
+	_chunked_multimesh(parent, meshes.flower, flowers, rng, "flower", 50.0, 0.0, Vector2(0.8, 1.3), true, 20.0)
 	return placed.rock
 
 
 static func _chunked_multimesh(parent: Node3D, mesh: Mesh, points: Array, rng: RandomNumberGenerator,
-		label: String, vis_range: float, jitter: float, scale_range: Vector2, flower_colors: bool = false) -> void:
-	const CHUNK := 40.0
+		label: String, vis_range: float, jitter: float, scale_range: Vector2, flower_colors: bool = false, chunk: float = 40.0) -> void:
 	var chunks: Dictionary = {}
 	for p in points:
-		var key := Vector2i(floori(p.x / CHUNK), floori(p.z / CHUNK))
+		var key := Vector2i(floori(p.x / chunk), floori(p.z / chunk))
 		if not chunks.has(key): chunks[key] = []
 		chunks[key].append(p)
 	var palette := [Color("#FFD34D"), Color("#FF8FB1"), Color("#FFFFFF"), Color("#9FC7FF"), Color("#FFB36B")]
@@ -297,7 +309,7 @@ static func _chunked_multimesh(parent: Node3D, mesh: Mesh, points: Array, rng: R
 		var mmi := MultiMeshInstance3D.new()
 		mmi.name = "%s_%d_%d" % [label, key.x, key.y]
 		mmi.multimesh = mm
-		mmi.material_override = MeshKit.mat("foliage") if label in ["grass", "flower"] else null
+		mmi.material_override = StyleMats.foliage("grass") if label in ["grass", "flower"] else null
 		mmi.visibility_range_end = vis_range
 		mmi.visibility_range_end_margin = 10.0
 		if label in ["grass", "flower"]:

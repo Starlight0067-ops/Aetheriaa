@@ -8,7 +8,7 @@ var npc_id := ""
 var look: Dictionary = {}
 var waypoints: Array = []      # Vector3 loop
 var walk_speed := 1.4
-var model: Humanoid
+var model   # CharacterModel or Humanoid fallback
 var _wp_i := 0
 var _wait := 0.0
 var _talking := false
@@ -32,7 +32,9 @@ func _ready() -> void:
 	var data: Dictionary = DB.npcs.get(npc_id, {})
 	prompt = "Talk to " + data.get("name", npc_id)
 	interact_radius = 2.8
-	model = Humanoid.create(look)
+	model = CharacterModel.load_character(npc_id)
+	if model == null:
+		model = Humanoid.create(look)
 	add_child(model)
 	var body := StaticBody3D.new()
 	body.collision_layer = 1

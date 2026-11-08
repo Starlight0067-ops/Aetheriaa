@@ -44,7 +44,7 @@ func _build() -> void:
 
 	# --- torso (pivot at hips) ---
 	torso = Node3D.new(); torso.name = "Torso"; torso.position.y = 0.86; add_child(torso)
-	var tk := MeshKit.new()
+	var tk := MeshKit.character_kit()
 	tk.cyl(Vector3(0, 0.28, 0), 0.17, 0.2, 0.5, outfit, 8)            # chest
 	tk.box(Vector3(0, 0.04, 0), Vector3(0.36, 0.1, 0.24), outfit2)       # belt
 	tk.cyl(Vector3(0, 0.54, 0), 0.06, 0.07, 0.1, skin, 6)               # neck
@@ -65,7 +65,7 @@ func _build() -> void:
 
 	# --- head ---
 	head = Node3D.new(); head.name = "Head"; head.position.y = 0.62; torso.add_child(head)
-	var hk := MeshKit.new()
+	var hk := MeshKit.character_kit()
 	hk.sphere(Vector3(0, 0.17, 0), Vector3(0.32, 0.36, 0.32), skin, 12)
 	for side in [-1.0, 1.0]:
 		hk.sphere(Vector3(side * 0.07, 0.16, -0.145), Vector3(0.06, 0.085, 0.03), Color("#1C1C2A"), 8)
@@ -90,7 +90,7 @@ func _build() -> void:
 
 	if cfg.get("weapon", false):
 		weapon = Node3D.new(); weapon.name = "Weapon"
-		var wk := MeshKit.new()
+		var wk := MeshKit.character_kit()
 		wk.box(Vector3(0, -0.02, 0), Vector3(0.04, 0.16, 0.04), Color("#4A3426"))
 		wk.box(Vector3(0, 0.07, 0), Vector3(0.16, 0.03, 0.05), Color("#C08A3E"))
 		wk.box(Vector3(0, 0.45, 0), Vector3(0.05, 0.72, 0.015), Color("#DDE8F2"))
@@ -131,7 +131,7 @@ func _add_hair(k: MeshKit, hair: Color) -> void:
 func _limb(pivot: Vector3, upper: Color, lower: Color, length: float, r: float, is_arm: bool) -> Node3D:
 	var n := Node3D.new()
 	n.position = pivot
-	var k := MeshKit.new()
+	var k := MeshKit.character_kit()
 	k.cyl(Vector3(0, -length * 0.3, 0), r, r * 0.9, length * 0.6, upper, 6)
 	if is_arm:
 		k.sphere(Vector3(0, -length * 0.82, 0), Vector3(r * 1.6, r * 1.8, r * 1.6), lower, 6)

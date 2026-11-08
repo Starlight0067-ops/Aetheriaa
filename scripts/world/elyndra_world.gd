@@ -13,6 +13,8 @@ var _sun: DirectionalLight3D
 var _env: Environment
 var _autosave := 300.0
 var _tick := 0.0
+var _windmill_sails: Node3D
+var _clouds: MeshInstance3D
 
 
 func _ready() -> void:
@@ -37,8 +39,10 @@ func _ready() -> void:
 	StructureBuilder.build_ruins(arch)
 	StructureBuilder.build_arena(arch)
 	core = StructureBuilder.build_core(arch)
+	_build_atmosphere()
 	for c in [Vector2(-62, 36), Vector2(52, 40), Vector2(-52, -48)]:
 		StructureBuilder.build_camp(arch, c)
+	_place_blender_props()
 	_place_points_of_interest()
 	_place_npcs()
 	_place_enemies()
@@ -53,6 +57,19 @@ func _ready() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	if not Quests.is_active("mq_awakening") and not Quests.is_done("mq_awakening"):
 		_intro()
+	if "--smoke-test" in OS.get_cmdline_user_args():
+		_smoke_report()
+
+
+## QA hook for exported builds:  AETHERIA.exe -- --smoke-test
+func _smoke_report() -> void:
+	await get_tree().create_timer(4.0).timeout
+	print("SMOKE: world=Elyndra player=%s on_floor=%s npcs=%d enemies=%d items_db=%d quests_db=%d quest=%s fps=%d" % [
+		str(player.global_position.round()), str(player.is_on_floor()), get_tree().get_nodes_in_group("npc").size(),
+		get_tree().get_nodes_in_group("enemy").size(), DB.items.size(), DB.quests.size(),
+		Quests.tracked_quest(), Engine.get_frames_per_second()])
+	print("SMOKE: OK")
+	get_tree().quit()
 
 
 func _p(x: float, z: float, lift: float = 0.0) -> Vector3:
@@ -73,15 +90,16 @@ func _build_environment() -> void:
 	_env.background_mode = Environment.BG_SKY
 	var sky := Sky.new()
 	var sm := ProceduralSkyMaterial.new()
-	sm.sky_top_color = Color("#4F8FE0")
-	sm.sky_horizon_color = Color("#CFE8FF")
-	sm.ground_horizon_color = Color("#CFE8FF")
-	sm.ground_bottom_color = Color("#6E8F6A")
-	sm.sun_angle_max = 20.0
+	sm.sky_top_color = Color("#3F7FD8")
+	sm.sky_horizon_color = Color("#CFE6FF")
+	sm.ground_horizon_color = Color("#CFE6FF")
+	sm.ground_bottom_color = Color("#7FA07A")
+	sm.sun_angle_max = 18.0
 	sky.sky_material = sm
+	sky.radiance_size = Sky.RADIANCE_SIZE_64
 	_env.sky = sky
 	_env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	_env.ambient_light_energy = 0.55
+	_env.ambient_light_energy = 0.6
 	_env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	_env.tonemap_exposure = 0.95
 	_env.fog_light_color = Color("#CFE3F5")
@@ -91,17 +109,29 @@ func _build_environment() -> void:
 	_env.glow_bloom = 0.05
 	_env.glow_hdr_threshold = 1.0
 	_env.adjustment_enabled = true
-	_env.adjustment_saturation = 1.12
+	_env.adjustment_saturation = 1.18
+	_env.adjustment_contrast = 1.06
 	we.environment = _env
 	add_child(we)
 	_sun = DirectionalLight3D.new()
 	_sun.name = "Sun"
-	_sun.rotation = Vector3(deg_to_rad(-48), deg_to_rad(-35), 0)
-	_sun.light_color = Color("#FFF0D6")
-	_sun.light_energy = 1.25
+	_sun.rotation = Vector3(deg_to_rad(-40), deg_to_rad(-35), 0)
+	_sun.light_color = Color("#FFE9CC")
+	_sun.light_energy = 1.35
 	_sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
 	_sun.shadow_blur = 1.5
 	add_child(_sun)
+	_clouds = MeshInstance3D.new()
+	_clouds.name = "CloudDome"
+	var dome := SphereMesh.new()
+	dome.radius = 200.0
+	dome.height = 400.0
+	dome.radial_segments = 24
+	dome.rings = 12
+	_clouds.mesh = dome
+	_clouds.material_override = StyleMats.cloud_dome_material()
+	_clouds.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_clouds)
 	_apply_graphics()
 
 
@@ -111,6 +141,72 @@ func _apply_graphics() -> void:
 	_sun.directional_shadow_max_distance = p.shadow_dist
 	_env.fog_enabled = p.fog
 	_env.glow_enabled = p.glow
+
+
+## Drifting Aether motes and forest fireflies (cheap CPU particles, unshaded).
+func _build_atmosphere() -> void:
+	var zones := [[L.CORE, 22.0, 26.0, 40, Color("#9FF8FF")], [L.RUINS, 12.0, 6.0, 24, Color("#9FF8FF")],
+		[Vector2(-58, 52), 30.0, 4.0, 40, Color("#FFF2A8")], [L.LAKE, 20.0, 3.0, 20, Color("#C8FFF4")]]
+	for z in zones:
+		var p := CPUParticles3D.new()
+		p.amount = z[3]
+		p.lifetime = 6.0
+		p.preprocess = 6.0
+		p.emission_shape = CPUParticles3D.EMISSION_SHAPE_BOX
+		p.emission_box_extents = Vector3(z[1], z[2], z[1])
+		p.direction = Vector3.UP
+		p.spread = 180.0
+		p.initial_velocity_min = 0.1
+		p.initial_velocity_max = 0.4
+		p.gravity = Vector3(0, 0.05, 0)
+		p.scale_amount_min = 0.5
+		p.scale_amount_max = 1.2
+		var q := QuadMesh.new()
+		q.size = Vector2(0.14, 0.14)
+		var m := StandardMaterial3D.new()
+		m.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		m.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+		m.albedo_color = z[4]
+		m.emission_enabled = true
+		m.emission = z[4]
+		m.emission_energy_multiplier = 3.0
+		q.material = m
+		p.mesh = q
+		var c: Vector2 = z[0]
+		p.position = Vector3(c.x, L.height(c.x, c.y) + z[2], c.y)
+		add_child(p)
+
+
+# ---------------------------------------------------------------- Blender-made props
+## GLB assets produced by blender/scripts/build_elyndra_props.py.
+func _place_blender_props() -> void:
+	var props := [
+		["res://assets/models/lantern_maiden_statue.glb", _p(-17.5, -27), PI * 0.5, Vector3(1.4, 2.0, 1.4)],
+		["res://assets/models/lantern_maiden_statue.glb", Vector3(L.RUINS.x + 1.0, 10.5, L.RUINS.y - 6.0), 0.0, Vector3(1.4, 2.0, 1.4)],
+		["res://assets/models/stone_well.glb", _p(-30, 13), 0.3, Vector3(1.2, 1.0, 1.2)],
+		["res://assets/models/market_cart.glb", _p(19, 13.5), -0.4, Vector3(1.4, 1.0, 0.8)],
+		["res://assets/models/windmill.glb", _p(-5, 70), PI * 0.8, Vector3(1.8, 3.0, 1.8)],
+	]
+	for pr in props:
+		if not ResourceLoader.exists(pr[0]):
+			push_warning("Missing Blender asset: " + pr[0])
+			continue
+		var inst: Node3D = (load(pr[0]) as PackedScene).instantiate()
+		inst.position = pr[1]
+		inst.rotation.y = pr[2]
+		add_child(inst)
+		var body := StaticBody3D.new()
+		var cs := CollisionShape3D.new()
+		var sh := CylinderShape3D.new()
+		var half: Vector3 = pr[3]
+		sh.radius = half.x
+		sh.height = half.y * 2.0
+		cs.shape = sh
+		cs.position.y = half.y
+		body.add_child(cs)
+		inst.add_child(body)
+		if pr[0].ends_with("windmill.glb"):
+			_windmill_sails = inst.find_child("Sails", true, false) as Node3D
 
 
 # ---------------------------------------------------------------- content placement
@@ -258,6 +354,11 @@ func _process(delta: float) -> void:
 			var r := core.get_node_or_null("Ring%d" % i) as Node3D
 			if r:
 				r.rotation.y += delta * (0.2 + i * 0.12) * (2.5 if Game.has_flag("act1_complete") else 1.0)
+	var cam := get_viewport().get_camera_3d()
+	if _clouds and cam:
+		_clouds.global_position = cam.global_position
+	if _windmill_sails:
+		_windmill_sails.rotate_object_local(Vector3.FORWARD, delta * 0.6)
 	_tick -= delta
 	if _tick <= 0.0:
 		_tick = 1.0

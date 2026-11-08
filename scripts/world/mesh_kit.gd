@@ -9,6 +9,8 @@ var _glow := SurfaceTool.new()
 var _has_base := false
 var _has_glow := false
 var glow_color := Color(0.5, 0.96, 1.0)
+var alpha := 1.0                 # surface pattern id for StyleMats.structure()
+var material_kind := "structure"
 
 static var _materials: Dictionary = {}
 
@@ -29,14 +31,16 @@ func add(prim: PrimitiveMesh, xform: Transform3D, color: Color, glow: bool = fal
 	var nbasis := basis.inverse().transposed()
 	if glow: _has_glow = true
 	else: _has_base = true
+	var c := color
+	c.a = 1.0 if glow else alpha
 	if indices.is_empty():
 		for i in verts.size():
-			st.set_color(color)
+			st.set_color(c)
 			st.set_normal((nbasis * normals[i]).normalized())
 			st.add_vertex(xform * verts[i])
 	else:
 		for i in indices:
-			st.set_color(color)
+			st.set_color(c)
 			st.set_normal((nbasis * normals[i]).normalized())
 			st.add_vertex(xform * verts[i])
 	return self
@@ -77,7 +81,7 @@ func build() -> ArrayMesh:
 	var mesh := ArrayMesh.new()
 	if _has_base:
 		_base.commit(mesh)
-		mesh.surface_set_material(mesh.get_surface_count() - 1, MeshKit.mat("toon"))
+		mesh.surface_set_material(mesh.get_surface_count() - 1, StyleMats.character() if material_kind == "character" else StyleMats.structure())
 	if _has_glow:
 		_glow.commit(mesh)
 		mesh.surface_set_material(mesh.get_surface_count() - 1, MeshKit.glow_mat(glow_color))
@@ -90,6 +94,12 @@ func instance(parent: Node, name: String = "Mesh") -> MeshInstance3D:
 	mi.mesh = build()
 	parent.add_child(mi)
 	return mi
+
+
+static func character_kit() -> MeshKit:
+	var k := MeshKit.new()
+	k.material_kind = "character"
+	return k
 
 
 # ---------------------------------------------------------------- shared materials

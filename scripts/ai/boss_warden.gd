@@ -38,7 +38,7 @@ func _build_model(_s: float) -> Node3D:
 	var stone := Color("#8E9AA8")
 	var dark := Color("#6A7686")
 	var glow := Color("#5FE3E0")
-	var k := MeshKit.new()
+	var k := MeshKit.character_kit()
 	k.glow_color = glow
 	k.cyl(Vector3(0, 0.8, 0), 0.9, 1.2, 1.6, dark, 6)                    # base
 	k.cyl(Vector3(0, 2.6, 0), 1.5, 1.0, 2.2, stone, 6)                   # torso
@@ -52,7 +52,7 @@ func _build_model(_s: float) -> Node3D:
 	_core = Node3D.new()
 	_core.position = Vector3(0, 2.7, -1.05)
 	root.add_child(_core)
-	var ck := MeshKit.new()
+	var ck := MeshKit.character_kit()
 	ck.glow_color = Color("#7FF5FF")
 	ck.sphere(Vector3.ZERO, Vector3(0.6, 0.75, 0.4), Color("#7FF5FF"), 8, true)
 	ck.instance(_core, "Heart")
@@ -65,7 +65,7 @@ func _arm(root: Node3D, side: float, stone: Color, dark: Color, glow: Color) -> 
 	var pivot := Node3D.new()
 	pivot.position = Vector3(side * 1.7, 3.9, 0)
 	root.add_child(pivot)
-	var k := MeshKit.new()
+	var k := MeshKit.character_kit()
 	k.glow_color = glow
 	k.cyl(Vector3(0, -1.0, 0), 0.35, 0.45, 2.0, stone, 6)
 	k.box(Vector3(0, -2.4, 0), Vector3(1.1, 1.1, 1.1), dark)

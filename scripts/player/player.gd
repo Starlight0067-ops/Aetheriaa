@@ -18,7 +18,7 @@ const STAMINA_REGEN := 26.0
 const COMBO := [1.0, 1.1, 1.6]
 
 var rig: CameraRig
-var model: Humanoid
+var model   # CharacterModel (Blender anime model) or Humanoid fallback
 var interact_target: Interactable
 var lock_target: Node3D
 var cooldowns: Dictionary = {}
@@ -51,22 +51,29 @@ func _ready() -> void:
 	cs.shape = cap
 	cs.position.y = 0.85
 	add_child(cs)
-	model = Humanoid.create({
-		"skin": "#F6D9C4", "hair": "#DCE3EA", "hair_style": "spiky", "eye": "#E2A13A",
-		"outfit": "#2F7F8A", "outfit2": "#C98A3E", "pants": "#2A2F45", "boots": "#5A3B2A",
-		"garment": "coat", "weapon": true,
-	})
-	model.name = "Model"
+	model = CharacterModel.load_character("kael")
+	if model == null:
+		model = _fallback_model()
 	add_child(model)
-	# pendant glow
-	var pk := MeshKit.new()
-	pk.glow_color = Color("#7FF5FF")
-	pk.sphere(Vector3(0, 0.36, -0.2), Vector3(0.07, 0.09, 0.04), Color("#7FF5FF"), 6, true)
-	pk.instance(model.torso, "Pendant")
+	if model is Humanoid:
+		var pk := MeshKit.new()
+		pk.glow_color = Color("#7FF5FF")
+		pk.sphere(Vector3(0, 0.36, -0.2), Vector3(0.07, 0.09, 0.04), Color("#7FF5FF"), 6, true)
+		pk.instance(model.torso, "Pendant")
 	rig = CameraRig.new()
 	rig.name = "CameraRig"
 	add_child(rig)
 	rig.setup(self)
+
+
+func _fallback_model() -> Humanoid:
+	var h := Humanoid.create({
+		"skin": "#F6D9C4", "hair": "#DCE3EA", "hair_style": "spiky", "eye": "#E2A13A",
+		"outfit": "#2F7F8A", "outfit2": "#C98A3E", "pants": "#2A2F45", "boots": "#5A3B2A",
+		"garment": "coat", "weapon": true,
+	})
+	h.name = "Model"
+	return h
 
 
 func _unhandled_input(event: InputEvent) -> void:

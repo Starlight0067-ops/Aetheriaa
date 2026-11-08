@@ -78,7 +78,7 @@ func _build_model(s: float) -> Node3D:
 	var root := Node3D.new()
 	var c := Color(def.get("color", "#7BC86C"))
 	var a := Color(def.get("accent", "#E9F59A"))
-	var k := MeshKit.new()
+	var k := MeshKit.character_kit()
 	k.glow_color = a
 	match def.get("shape", "wisp"):
 		"wisp":
