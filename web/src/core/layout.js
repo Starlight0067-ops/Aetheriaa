@@ -33,9 +33,9 @@ export const STREETS = {
 export const VIEWS = {
   overview: { pos: [-150, 78, 150], target: [10, 22, -10], fov: 50 },
   plaza:    { pos: [15, 27.5, 31], target: [0, 23.5, -2], fov: 55 },
-  street:   { pos: [-50, 19.5, 13], target: [-12, 22, 0], fov: 55 },
+  street:   { pos: [-56, 18.8, 3.2], target: [4, 23, 1], fov: 58 },
   bridge:   { pos: [-170, 40, 55], target: [-100, 15, 3], fov: 50 },
-  hall:     { pos: [14, 37, -4], target: [62, 49, -62], fov: 55 },
+  hall:     { pos: [1, 27, -8], target: [52, 49, -54], fov: 55 },
   meadow:   { pos: [-128, 23, 44], target: [-200, 33, 0], fov: 55 },
   portrait: { follow: 'player', offset: [0, 1.55, 1.0], look: [0, 1.5, 0], fov: 32 },
   fullbody: { follow: 'player', offset: [0, 1.05, 3.3], look: [0, 0.92, 0], fov: 40 },
