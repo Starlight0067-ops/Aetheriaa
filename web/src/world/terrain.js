@@ -7,7 +7,7 @@ import { WORLD, heightAt } from '../core/layout.js';
 import { createToonMaterial } from '../render/toon.js';
 import { getWorldData, MASK_RES, splatAt, pathDist, inTown } from './nature/worlddata.js';
 import { loadNatureTextures } from './nature/textures.js';
-import { patchMaterial, WIND, vnoise, sstep } from './nature/common.js';
+import { patchMaterial, WIND, vnoise, sstep, HAZE, HAZE_FRAG, setHazeFromQuality } from './nature/common.js';
 
 const HALF = WORLD.half;
 /** Shared with the nature systems (grass colour matching). */
@@ -62,6 +62,7 @@ uniform vec3 uGolden;
 uniform vec3 uForest;
 uniform vec3 uSand;
 uniform vec3 uSnow;
+uniform vec4 uHaze;
 vec3 natLuma3(vec3 c) { return vec3(dot(c, vec3(0.299, 0.587, 0.114))); }
 `;
 const TERRAIN_FRAG = /* glsl */`
@@ -77,7 +78,7 @@ const TERRAIN_FRAG = /* glsl */`
 
   // ---- grass: dual-scale sampling (anti-tiling) re-tinted to the palette through macro colour patches
   float camDist = distance(vTW, cameraPosition);
-  vec2 warp = (nM.rg - 0.5) * 2.2 + (nS.ba - 0.5) * 0.6;
+  vec2 warp = (nM.rg - 0.5) * 0.45 + (nS.ba - 0.5) * 0.18;
   vec3 g1 = texture2D(uGrassTex, wxz * 0.23 + warp).rgb;
 #ifndef TERRAIN_LQ
   vec3 g2 = texture2D(uGrassTex, mat2(0.8, -0.6, 0.6, 0.8) * wxz * 0.071 + 0.37 - warp * 0.5).rgb;
@@ -100,8 +101,10 @@ const TERRAIN_FRAG = /* glsl */`
   macro = mix(macro, uForest * (0.85 + 0.3 * nS.g), ff * 0.8);
   vec3 col = macro * gdet;
   col = mix(col, litter, ff * smoothstep(0.55, 0.75, nX.g * 0.6 + nS.b * 0.4) * 0.6);
-  // town lawn: tidier, a little darker
-  col = mix(col, col * vec3(0.92, 0.96, 0.95), sB.a * 0.5);
+  // town lawn: tidier, less saturated, stronger painted detail
+  vec3 lawn = mix(uLush, uDeep, 0.35) * mix(vec3(1.0), clamp(gt / uGrassAvg, vec3(0.45), vec3(1.6)), 0.9);
+  lawn = mix(lawn, natLuma3(lawn), 0.18) * (0.9 + 0.2 * nX.b);
+  col = mix(col, lawn, sB.a * 0.75);
 
   // ---- meadow flowers (speckles; geometry flowers are added near the camera)
   vec4 nF = texture2D(uNoiseTex, wxz * 0.95 + 0.71);
@@ -130,27 +133,49 @@ const TERRAIN_FRAG = /* glsl */`
   float cw = smoothstep(0.4, 0.6, sA.b + (nX.r - 0.5) * 0.35);
   col = mix(col, cob, cw);
 
-  // ---- rock and cliffs on steep slopes (triplanar)
+  // ---- mountains: alpine grass, painted forest patches (lower slopes) before the rock pass
+  float alt = vTW.y;
   vec3 tn = normalize(vTN);
   float ny = tn.y;
-  float rw = smoothstep(0.80, 0.68, ny + (nS.g - 0.5) * 0.14 + (nX.a - 0.5) * 0.05);
+  float mtn = smoothstep(35.0, 70.0, alt);
+  vec3 alpine = mix(uDeep, uLight, 0.35 + 0.4 * nM.g) * mix(vec3(1.0), vec3(0.86, 0.95, 1.05), smoothstep(80.0, 160.0, alt));
+  col = mix(col, alpine * (0.85 + 0.3 * nX.r), mtn * 0.7);
+  float forestP = smoothstep(0.48, 0.6, nM.b * 0.6 + nL.a * 0.4) * (1.0 - smoothstep(95.0, 135.0, alt + (nS.r - 0.5) * 30.0)) * mtn;
+  vec3 pforest = mix(vec3(0.05, 0.16, 0.10), vec3(0.11, 0.26, 0.13), smoothstep(0.35, 0.75, nX.g)) * (0.8 + 0.4 * nS.b);
+  col = mix(col, pforest, forestP * smoothstep(0.55, 0.7, ny) * 0.92);
+
+  // ---- rock and cliffs on steep slopes (triplanar), steeper allowed for grass at low altitude
+  float rockLimit = mix(0.74, 0.84, smoothstep(70.0, 170.0, alt));
+  float rw = smoothstep(rockLimit + 0.06, rockLimit - 0.06, ny + (nS.g - 0.5) * 0.16 + (nX.a - 0.5) * 0.06);
+  float farT = smoothstep(70.0, 260.0, camDist);
 #ifndef TERRAIN_LQ
   vec3 bw = pow(abs(tn), vec3(4.0)); bw /= dot(bw, vec3(1.0));
   vec3 rx = texture2D(uRockTex, vec2(vTW.z, -vTW.y) * 0.085).rgb;
   vec3 rz = texture2D(uRockTex, vec2(vTW.x, -vTW.y) * 0.085).rgb;
   vec3 ry = texture2D(uRockTex, wxz * 0.085).rgb;
   vec3 rock = rx * bw.x + ry * bw.y + rz * bw.z;
+  vec3 rx2 = texture2D(uRockTex, vec2(vTW.z, -vTW.y) * 0.019 + 0.3).rgb;
+  vec3 rz2 = texture2D(uRockTex, vec2(vTW.x, -vTW.y) * 0.019 + 0.6).rgb;
+  vec3 rockFar = (rx2 * (bw.x + bw.y * 0.5) + rz2 * (bw.z + bw.y * 0.5));
+  rock = mix(rock, rockFar, farT * 0.85);
 #else
-  vec3 rock = abs(tn.x) > abs(tn.z) ? texture2D(uRockTex, vec2(vTW.z, -vTW.y) * 0.085).rgb : texture2D(uRockTex, vec2(vTW.x, -vTW.y) * 0.085).rgb;
+  vec3 rock = abs(tn.x) > abs(tn.z) ? texture2D(uRockTex, vec2(vTW.z, -vTW.y) * mix(0.085, 0.022, farT)).rgb : texture2D(uRockTex, vec2(vTW.x, -vTW.y) * mix(0.085, 0.022, farT)).rgb;
 #endif
-  rock *= mix(vec3(1.0), vec3(0.93, 0.96, 1.04), nM.r);
-  // moss on the less steep parts of the rock
-  rock = mix(rock, col * 0.85, smoothstep(0.62, 0.78, ny) * 0.55);
+  // painterly strata and massif colour variation
+  float band = sin(alt * 0.075 + nM.r * 5.0 + nL.b * 3.0) * 0.5 + 0.5;
+  vec3 warm = vec3(1.08, 0.97, 0.84), cool = vec3(0.78, 0.86, 1.02);
+  rock *= mix(cool, warm, smoothstep(0.25, 0.75, band) * 0.8 + nL.g * 0.2);
+  rock *= 0.82 + 0.3 * nM.a;
+  // moss and grass ledges on the less steep parts of the rock
+  rock = mix(rock, col * 0.82, smoothstep(rockLimit - 0.1, rockLimit + 0.04, ny) * 0.6);
   col = mix(col, rock, rw);
 
-  // ---- snow on the high rim peaks
-  float sn = smoothstep(175.0, 215.0, vTW.y + (nM.b - 0.5) * 70.0) * smoothstep(0.35, 0.6, ny + 0.25);
-  col = mix(col, uSnow * (0.9 + 0.1 * nS.r), sn);
+  // ---- snow caps (with streaks down the gullies)
+  float snowLine = 150.0 + (nM.b - 0.5) * 60.0 + (nS.a - 0.5) * 20.0;
+  float sn = smoothstep(snowLine, snowLine + 22.0, alt) * smoothstep(0.25, 0.5, ny + 0.2 * nX.r);
+  sn = max(sn, smoothstep(snowLine - 30.0, snowLine + 10.0, alt) * smoothstep(0.62, 0.8, nS.b) * smoothstep(0.3, 0.55, ny));
+  vec3 snowC = uSnow * mix(vec3(0.86, 0.9, 1.0), vec3(1.0), smoothstep(0.4, 0.9, ny));
+  col = mix(col, snowC, sn);
 
   diffuseColor.rgb *= col;
 }
@@ -168,11 +193,12 @@ function createTerrainMaterial(tex, quality) {
       uGrassAvg: { value: c(0x63ae25) },
       uLush: { value: c(0x5fb444) }, uLight: { value: c(0x9ad25c) }, uDeep: { value: c(0x3f9440) },
       uGolden: { value: c(0xc2c25e) }, uForest: { value: c(0x3c7a3c) }, uSand: { value: c(0xd8c79c) }, uSnow: { value: c(0xf2f6ff) },
+      uHaze: HAZE.uHaze,
     },
     vertexPars: TERRAIN_VERT_PARS,
     fragmentPars: TERRAIN_FRAG_PARS,
     vertex: [['#include <begin_vertex>', 'vTW = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvTN = normalize(mat3(modelMatrix) * objectNormal);']],
-    fragment: [['#include <color_fragment>', TERRAIN_FRAG, 'replace']],
+    fragment: [['#include <color_fragment>', TERRAIN_FRAG, 'replace'], ['#include <opaque_fragment>', HAZE_FRAG, 'before']],
   });
   return mat;
 }
@@ -289,6 +315,11 @@ export async function create(ctx) {
   const data = getWorldData(quality);
   const tex = await loadNatureTextures(ctx);
   WIND.uNoiseTex.value = tex.noise;
+  setHazeFromQuality(quality);
+  if (scene.fog && scene.fog.color) { // follow the render owner's horizon colour, slightly lifted
+    const fc = scene.fog.color.clone().lerp(new THREE.Color(1, 1, 1), 0.12);
+    HAZE.uHaze.value.set(fc.r, fc.g, fc.b, HAZE.uHaze.value.w);
+  }
   const splatA = makeSplatTexture(data.splatA), splatB = makeSplatTexture(data.splatB);
   const material = createTerrainMaterial({ ...tex, splatA, splatB }, quality);
   Object.assign(terrainShared, { splatA, splatB, material });

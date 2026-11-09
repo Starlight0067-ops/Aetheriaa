@@ -35,7 +35,7 @@ export async function create(ctx) {
   const sunColor = new THREE.Color(0xfff0dc);
 
   // Sky-tinted fill: cool blue from above, warm green-ochre bounce from the ground.
-  const hemi = new THREE.HemisphereLight(0xbcdcff, 0xa39a74, 1.45);
+  const hemi = new THREE.HemisphereLight(0xbcdcff, 0xa39a74, 1.62);
   hemi.position.set(0, 1, 0);
   scene.add(hemi);
 

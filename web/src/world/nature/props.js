@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { WORLD, POI, RIVER, TOWN, heightAt } from '../../core/layout.js';
 import { createToonMaterial } from '../../render/toon.js';
 import { mulberry32, hash2i, vnoise, sstep } from './common.js';
-import { Builder, card, randUnit, windPatch, depthMaterialFor } from './trees.js';
+import { Builder, card, randUnit, windPatch, depthMaterialFor, hazePatch } from './trees.js';
 import { forestField, heightFast, slopeAt, splatAt, pathDist, streetDist, inTown, dTown, dLake, waterLevelAt, nearBridge, riverDist, PATHS } from './worlddata.js';
 
 const V3 = THREE.Vector3;
@@ -222,8 +222,8 @@ export function createProps(ctx, tex, treeList) {
   };
 
   // materials
-  const rockMat = createToonMaterial({ kind: 'stone', map: tex.rock, vertexColors: true });
-  const woodMat = createToonMaterial({ kind: 'wood', map: tex.bark, vertexColors: true });
+  const rockMat = hazePatch(createToonMaterial({ kind: 'stone', map: tex.rock, vertexColors: true }), 'rock-haze');
+  const woodMat = hazePatch(createToonMaterial({ kind: 'wood', map: tex.bark, vertexColors: true }), 'wood-haze');
   const bushMat = windPatch(createToonMaterial({ kind: 'foliage', map: tex.broadleaf, alphaTest: 0.5, side: THREE.DoubleSide, vertexColors: true }), 'bush-leaves', 0.12, true);
   const bloomMat = windPatch(createToonMaterial({ kind: 'foliage', map: tex.blossom, alphaTest: 0.5, side: THREE.DoubleSide, vertexColors: true }), 'bush-leaves', 0.12, true);
   const reedMat = windPatch(createToonMaterial({ kind: 'foliage', map: tex.reed, alphaTest: 0.5, side: THREE.DoubleSide, vertexColors: true }), 'reed', 0.35, true);

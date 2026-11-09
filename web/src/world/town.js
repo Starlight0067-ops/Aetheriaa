@@ -6,7 +6,9 @@ import { POI, heightAt } from '../core/layout.js';
 import { createMaterials, PALETTE } from './town/materials.js';
 import { loadKit, StaticBatcher, normalizeGeometry } from './town/batch.js';
 import { makePlan } from './town/plan.js';
-import { buildStreets, buildPlaza } from './town/streets.js';
+import { buildStreets, buildPlaza, buildSteps, buildPaving } from './town/streets.js';
+import { dressPlaza } from './town/plazadress.js';
+import { loadQuaternius } from './town/quat.js';
 import { placeLandmarks } from './town/landmarks.js';
 import { placeProps } from './town/props.js';
 import { createDynamics } from './town/dynamic.js';
@@ -47,10 +49,12 @@ export async function create(ctx) {
     const loads = ['houses', 'landmarks'].map(async (k) => {
       try { kits[k] = await loadKit(ctx, BASE + k + '.glb'); } catch (e) { console.warn('[town] kit missing', k, e?.message || e); kits[k] = new Map(); }
     });
+    let quat = new Map();
+    loads.push(loadQuaternius(ctx, mats).then((m) => { quat = m; }).catch((e) => console.warn('[town] quaternius kit', e)));
     const pending = Promise.all(loads);
     ctx.pending.push(pending);
     await pending;
-    const allPieces = new Map([...kits.houses, ...kits.landmarks]);
+    const allPieces = new Map([...kits.houses, ...kits.landmarks, ...quat]);
     allPieces.set('block', blockPiece());
     const piece = (n) => allPieces.get(n);
 
@@ -87,6 +91,28 @@ export async function create(ctx) {
     const dyn = { spinners: [], banners: [], flags: [], anchors: [], lanterns: [] };
     try { placeLandmarks(ctx, plan, piece, batch, dyn, group); } catch (e) { console.error('[town] landmarks failed', e); }
     try { placeProps(ctx, plan, piece, batch, dyn); } catch (e) { console.error('[town] props failed', e); }
+    let dressing = null;
+    try { dressing = dressPlaza(ctx, plan, piece, batch, dyn); } catch (e) { console.error('[town] plaza dressing failed', e); }
+
+    // a few plaza / square trees from the nature module (blossom + broadleaf) in stone planters
+    try {
+      const nat = ctx.systems.world?.nature || window.__AETHERIA_NATURE;
+      if (nat?.createTree) {
+        const spots = [[158, 20.8, 'blossom', 0.55], [-20, 21.0, 'blossom', 0.5], [-150, 21.0, 'broadleaf', 0.45]];
+        for (const [ad, r, sp, sc] of spots) {
+          const a = ad * Math.PI / 180, x = POI.plaza.x + r * Math.cos(a), z = POI.plaza.z + r * Math.sin(a);
+          const tr = nat.createTree(sp, 3 + Math.round(r), sc);
+          tr.position.set(x, POI.plaza.y + 0.55, z);
+          group.add(tr);
+          tmpM.compose(new THREE.Vector3(x, POI.plaza.y + 0.6, z), q.identity(), new THREE.Vector3(2.4, 0.6, 2.4));
+          batch.add(piece('block'), tmpM, { stone: 0xf3ece0 });
+          ctx.colliders.push({ kind: 'box', center: [x, POI.plaza.y + 0.5, z], half: [1.2, 0.5, 1.2], rotationY: 0 });
+        }
+        const g = nat.createTree('broadleaf', 41, 0.5);
+        g.position.set(-58.5, heightAt(-58.5, 19) + 0.1, 19);
+        group.add(g);
+      }
+    } catch (e) { console.warn('[town] plaza trees', e); }
 
     batch.build(group);
     api.batch = batch;
@@ -97,6 +123,26 @@ export async function create(ctx) {
       meshes.forEach((m) => group.add(m));
       ctx.colliders.push(...colliders);
       buildPlaza(mats).forEach((m) => group.add(m));
+      // gate square inside the West Gate (foreground of the street view)
+      const gatePoly = [[-61, 4.5], [-42, 6.5], [-37, 11], [-39, 21], [-50, 24], [-61, 15]];
+      group.add(buildPaving(mats, gatePoly));
+      // thin pavement slabs: walkable and they tell the grass system where the town is paved
+      const inPoly = (x, z, poly) => { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, zi] = poly[i], [xj, zj] = poly[j]; if (((zi > z) !== (zj > z)) && (x < (xj - xi) * (z - zi) / (zj - zi) + xi)) c = !c; } return c; };
+      for (let x = -61; x < -36; x += 4) for (let z = 4; z < 25; z += 4) {
+        if (!inPoly(x + 2, z + 2, gatePoly)) continue;
+        const y = Math.min(heightAt(x, z), heightAt(x + 4, z), heightAt(x, z + 4), heightAt(x + 4, z + 4));
+        ctx.colliders.push({ kind: 'box', center: [x + 2, y - 0.05, z + 2], half: [2, 0.12, 2], rotationY: 0, pavement: true });
+      }
+      if (dressing?.sector) {
+        const st = buildSteps(mats, dressing.sector);
+        st.meshes.forEach((m) => group.add(m));
+        ctx.colliders.push(st.collider);
+        const sec = dressing.sector;
+        for (let r = sec.r0 + 1.5; r < sec.r1; r += 3) for (let a = sec.a0 + 0.05; a < sec.a1; a += 0.1) {
+          const x = sec.cx + r * Math.cos(a), z = sec.cz + r * Math.sin(a);
+          ctx.colliders.push({ kind: 'box', center: [x, st.heightAtCell(x, z) - 0.3, z], half: [1.5, 0.12, 1.5], rotationY: -a, pavement: true });
+        }
+      }
     } catch (e) { console.error('[town] streets failed', e); }
 
     // ---------------- animated cloth, sails, bunting

@@ -140,7 +140,8 @@ export class PlayerController {
     const c = this.controls.state;
     if (c.jumpPressed) this.jumpBufT = this.tuning.jumpBuffer;
     if (c.dodgePressed) this.dodgeBufT = this.tuning.dodgeBuffer;
-    const n = Math.max(1, Math.ceil(dt / (1 / 45) - 1e-6));
+    if (!(dt > 0)) return;
+    const n = Math.max(1, Math.ceil(dt / (1 / 30) - 1e-6));
     const h = dt / n;
     const t0 = performance.now();
     for (let i = 0; i < n; i++) this.step(h, c);
@@ -401,11 +402,20 @@ export class PlayerController {
     this.stepOffset = damp(this.stepOffset, 0, 16, dt);
 
     const groundedAnim = this.mode !== 'air' || (!this.jumped && this.airTime < 0.12);
-    this.visual.setLocomotion(this.animSpeed, groundedAnim, this.mode === 'swim' ? 0 : this.actualVelocity.y);
     this.syncRoot(dt);
+    this.visual.setLocomotion(this.animSpeed, groundedAnim, this.mode === 'swim' ? 0 : this.actualVelocity.y);
   }
 
   syncRoot() {
+    // Never let a non-finite value reach the scene graph: it would poison every child matrix (invisible character).
+    const fin = Number.isFinite;
+    if (!fin(this.animSpeed)) this.animSpeed = 0;
+    if (!fin(this.lean)) this.lean = 0;
+    if (!fin(this.turnVel)) this.turnVel = 0;
+    if (!fin(this.stepOffset)) this.stepOffset = 0;
+    if (!fin(this.facing)) this.facing = 0;
+    if (!fin(this.actualVelocity.x + this.actualVelocity.y + this.actualVelocity.z)) this.actualVelocity.set(0, 0, 0);
+    if (!fin(this.velocity.x + this.velocity.y + this.velocity.z)) this.velocity.set(0, 0, 0);
     this.root.position.copy(this.position);
     this.root.rotation.y = this.facing;
     const pivot = this.visual.pivot;

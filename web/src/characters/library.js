@@ -7,6 +7,7 @@
 // Vite watches the glob folders, so dropping new files in assets_src reloads the page and lights them up.
 import { matchAction } from './names.js';
 import { retargetAsset } from './retarget.js';
+import { tuneClip } from './tuning.js';
 
 const devFBX = import.meta.glob('/assets_src/mixamo/*.{fbx,FBX}', { query: '?url', import: 'default' });
 const devVRM = import.meta.glob('/assets_src/vroid/*.{vrm,VRM}', { query: '?url', import: 'default' });
@@ -55,13 +56,13 @@ export function loadNormClip(action) {
     if (!info) return null;
     if (info.json) {
       const j = await fetchJSON(info.json);
-      if (j?.bones) return j;
+      if (j?.bones) return tuneClip(action, j);
     }
     const url = info.devFbx ? await info.devFbx() : info.fbx;
     if (!url) return null;
     if (!fbxLoader) { const { FBXLoader } = await import('three/examples/jsm/loaders/FBXLoader.js'); fbxLoader = new FBXLoader(); }
     const asset = await fbxLoader.loadAsync(url);
-    return retargetAsset(asset, { name: action });
+    return tuneClip(action, retargetAsset(asset, { name: action }));
   })().catch((e) => { console.warn('[characters] animation', action, 'failed:', e.message); return null; });
   normCache.set(action, p);
   return p;

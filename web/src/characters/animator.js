@@ -106,7 +106,8 @@ export class Animator {
   }
 
   update(dt) {
-    if (dt <= 0) return;
+    // dt == 0 (paused / screenshot freeze): re-apply the current pose so additive layers (look-at) never accumulate
+    if (!(dt > 0)) { this.mixer.update(0); return; }
     // ---- overlays
     let overW = 0;
     for (const o of this.overlays) {

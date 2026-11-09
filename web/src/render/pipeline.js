@@ -116,6 +116,9 @@ void mainImage( const in vec4 inputColor, const in vec2 uv, const in float depth
   l = dot( g, vec3( 0.2126, 0.7152, 0.0722 ) );
   float sat = max( max( g.r, g.g ), g.b ) - min( min( g.r, g.g ), g.b );
   g = l + ( g - l ) * mix( uSaturation, 1.0, smoothstep( 0.4, 0.9, sat ) * 0.5 ); // vibrance-style
+  // tame acid yellow-greens (keep foliage lush, never neon): pull G toward R/B midpoint when G dominates
+  float gDom = clamp( ( g.g - max( g.r, g.b ) ) * 2.5, 0.0, 1.0 ) * smoothstep( 0.25, 0.7, g.g );
+  g.g = mix( g.g, max( g.r, g.b ) + ( g.g - max( g.r, g.b ) ) * 0.78, gDom );
   vec2 q = uv - 0.5;
   float v = smoothstep( 0.35, 0.95, length( q * vec2( 1.1, 1.0 ) ) );
   g *= mix( vec3( 1.0 ), vec3( 0.86, 0.88, 0.97 ), v * uVignette * 2.0 );
@@ -130,7 +133,7 @@ class GradeEffect extends Effect {
       blendFunction: BlendFunction.SET,
       uniforms: new Map([
         ['uExposure', { value: 1.0 }],
-        ['uSaturation', { value: 1.2 }],
+        ['uSaturation', { value: 1.12 }],
         ['uContrast', { value: 1.09 }],
         ['uShadowTone', { value: new THREE.Vector3(-0.012, 0.0, 0.03) }],
         ['uHighTone', { value: new THREE.Vector3(0.02, 0.01, -0.012) }],

@@ -2,6 +2,7 @@
 // windmill/crystal spinners registered by landmarks.js. One updater for the whole town.
 import * as THREE from 'three';
 import { createToonMaterial } from '../../render/toon.js';
+import { createBunting } from './bunting.js';
 
 const TAU = Math.PI * 2;
 
@@ -155,6 +156,9 @@ export function createDynamics(ctx, plan, mats, dyn, group) {
     group.add(pts);
   }
 
+  let bunting = null;
+  try { bunting = createBunting(group, dyn.bunting || [], ctx.quality.name); } catch (e) { console.warn('[town] bunting failed', e); }
+
   function wave(item, time, normal) {
     const p = item.mesh.geometry.attributes.position;
     const a = p.array, base = item.base;
@@ -179,10 +183,11 @@ export function createDynamics(ctx, plan, mats, dyn, group) {
     for (const b of banners) wave(b, time, true);
     // flags: cheaper normals (they are small)
     for (const f of flags) wave(f, time, false);
+    bunting?.update(time);
     if (lanternMat) lanternMat.opacity = 0.66 + Math.sin(time * 2.1) * 0.07 + Math.sin(time * 5.7) * 0.035;
     if (mats.glow?.emissiveIntensity !== undefined) mats.glow.emissiveIntensity = 1.55 + Math.sin(time * 3.1) * 0.09;
     if (mats.aether?.emissiveIntensity !== undefined) mats.aether.emissiveIntensity = 2.2 + Math.sin(time * 1.7) * 0.12;
   });
 
-  return { banners: banners.length, flags: flags.length, lanterns: lanterns.length, spinners: spinners.length };
+  return { bunting: bunting?.count || 0, banners: banners.length, flags: flags.length, lanterns: lanterns.length, spinners: spinners.length };
 }

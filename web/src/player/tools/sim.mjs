@@ -29,6 +29,8 @@ const tick = (n = 1) => { for (let i = 0; i < n; i++) { ctx.time += dt; physics.
 const f = (v) => +v.toFixed(3);
 const show = (label) => console.log(label.padEnd(18), 'pos', [f(P.position.x), f(P.position.y), f(P.position.z)], 'dev', f(P.position.y - heightAt(P.position.x, P.position.z)),
   'mode', P.mode, 'gr', P.grounded, 'spd', f(Math.hypot(P.actualVelocity.x, P.actualVelocity.z)), 'yaw', f(P.facing), 'stam', f(P.stamina.value), 'cam', ctx.camera.position.toArray().map(f));
+physics.update(0); P.update(0); rig.update(0);   // THREE.Clock's first getDelta() is 0
+console.log('zero-dt frame finite:', [P.animSpeed, P.lean, P.actualVelocity.x, P.position.y, ctx.camera.position.x].every(Number.isFinite));
 tick(30); show('spawn');
 c.moveY = 1; c.moveMag = 1; tick(90); show('run 1.5s');
 c.sprintHeld = true; tick(90); show('sprint 1.5s');

@@ -5,7 +5,7 @@
 // CPU distance LOD + frustum culling, vertex-shader wind with gusts and leaf flutter.
 import * as THREE from 'three';
 import { createToonMaterial } from '../../render/toon.js';
-import { mulberry32, patchMaterial, WIND, WIND_GLSL } from './common.js';
+import { mulberry32, patchMaterial, WIND, WIND_GLSL, HAZE, HAZE_PARS, HAZE_FRAG } from './common.js';
 
 const V3 = THREE.Vector3;
 const UP = new V3(0, 1, 0);
@@ -399,7 +399,7 @@ const TREE_VERT = /* glsl */`
 `;
 
 export function windPatch(mat, key, windScale, leaves) {
-  const fragment = [];
+  const fragment = [['#include <opaque_fragment>', HAZE_FRAG, 'before']];
   if (leaves) {
     fragment.push(['#include <normal_fragment_begin>', 'normal = normalize( vNormal );']);
     fragment.push(['#include <alphatest_fragment>', `
@@ -411,8 +411,9 @@ export function windPatch(mat, key, windScale, leaves) {
 #endif`, 'before']);
   }
   patchMaterial(mat, {
-    key, uniforms: { uTime: WIND.uTime, uWind: WIND.uWind, uNoiseTex: WIND.uNoiseTex, uWindScale: { value: windScale } },
+    key, uniforms: { uTime: WIND.uTime, uWind: WIND.uWind, uNoiseTex: WIND.uNoiseTex, uWindScale: { value: windScale }, uHaze: HAZE.uHaze },
     vertexPars: WIND_GLSL + '\nattribute vec4 aWind;\nuniform float uWindScale;\n',
+    fragmentPars: HAZE_PARS,
     vertex: [['#include <begin_vertex>', TREE_VERT]],
     fragment,
   });
@@ -449,13 +450,14 @@ export class TreeSystem {
     this.ctx = ctx;
     this.mats = mats;
     const low = ctx.quality.name === 'low';
-    this.lodDist = opts.lodDist || (low ? [38, 110] : [75, 210]);
+    this.lodDist = opts.lodDist || (low ? [36, 105] : [75, 210]);
     this.maxDist = ctx.quality.drawDistance * 0.92;
     this.variantsPerSpecies = low ? 2 : 3;
     this.group = new THREE.Group();
     this.group.name = 'trees';
     ctx.scene.add(this.group);
     this.variants = {};
+    this.kitVariants = {};
     this.instances = [];
     this.lastPos = new THREE.Vector3(1e9, 0, 0);
     this.lastDir = new THREE.Vector3();
@@ -466,19 +468,33 @@ export class TreeSystem {
     const key = species + v;
     if (!this.variants[key]) {
       const geo = buildTreeVariant(species, v + 1);
-      const mats = this.mats[species];
-      const buckets = geo.lod.map((L, li) => ({ L, li, meshes: [] }));
-      this.variants[key] = { key, species, geo, buckets, list: [] };
+      const m = this.mats[species];
+      const buckets = geo.lod.map((L, li) => ({
+        li,
+        parts: [
+          ...(L.trunk ? [{ geometry: L.trunk, material: m.trunk, cast: li < 2, receive: true }] : []),
+          { geometry: L.leaves, material: m.leaves, depth: m.leavesDepth, cast: li < 2, receive: false },
+        ],
+      }));
+      this.variants[key] = { key, species, radius: geo.radius, height: geo.height, buckets, lodMap: [0, 1, 2], list: [] };
     }
     return this.variants[key];
   }
-  /** t: {species, x, y, z, rot, s, variant, tint, white} */
+  /** Register a kit (glTF) tree: model parts for LOD0, a crossed-card impostor for everything farther. */
+  addKitVariant(key, model, impostor) {
+    const near = { li: 0, parts: model.parts.map((p) => ({ geometry: p.geometry, material: p.material, depth: p.depth, cast: true, receive: !p.foliage })) };
+    const far = { li: 1, parts: [{ geometry: impostor.geometry, material: impostor.material, depth: impostor.depth, cast: true, receive: false }] };
+    this.variants[key] = { key, species: key, kit: true, radius: model.radius + 0.5, height: model.height, buckets: [near, far], lodMap: [0, 1, 1], list: [] };
+    return this.variants[key];
+  }
+  /** t: {species, x, y, z, rot, s, variant, tint, white, kitKey?} */
   add(t) {
-    const v = this.variant(t.species, t.variant % this.variantsPerSpecies);
-    const inst = { ...t, v, r: v.geo.radius * t.s, h: v.geo.height * t.s, m: new THREE.Matrix4(), c: new THREE.Color() };
+    const v = t.kitKey ? this.variants[t.kitKey] : this.variant(t.species, t.variant % this.variantsPerSpecies);
+    const inst = { ...t, v, r: v.radius * t.s, h: v.height * t.s, m: new THREE.Matrix4(), c: new THREE.Color() };
     inst.m.compose(new THREE.Vector3(t.x, t.y - 0.15, t.z), new THREE.Quaternion().setFromAxisAngle(UP, t.rot), new THREE.Vector3(t.s, t.s * (0.92 + (t.tint || 0) * 0.16), t.s));
     const tv = t.tint ?? 0.5;
-    if (t.white) inst.c.setRGB(1.0, 1.32, 1.3);
+    if (t.color) inst.c.copy(t.color);
+    else if (t.white) inst.c.setRGB(1.0, 1.32, 1.3);
     else inst.c.setRGB(0.9 + tv * 0.18, 0.92 + (1 - tv) * 0.14, 0.88 + tv * 0.1);
     v.list.push(inst);
     this.instances.push(inst);
@@ -487,28 +503,22 @@ export class TreeSystem {
   finalize() {
     for (const key in this.variants) {
       const v = this.variants[key];
-      const n = v.list.length;
+      const n = Math.max(1, v.list.length);
       for (const b of v.buckets) {
-        const mats = this.mats[v.species];
-        const leaves = new THREE.InstancedMesh(b.L.leaves, mats.leaves, n);
-        leaves.frustumCulled = false;
-        leaves.castShadow = b.li < 2;
-        leaves.receiveShadow = false;
-        leaves.customDepthMaterial = mats.leavesDepth;
-        leaves.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(n * 3), 3);
-        leaves.count = 0;
-        this.group.add(leaves);
-        b.leaves = leaves;
-        if (b.L.trunk) {
-          const trunk = new THREE.InstancedMesh(b.L.trunk, mats.trunk, n);
-          trunk.instanceMatrix = leaves.instanceMatrix;
-          trunk.instanceColor = null;
-          trunk.frustumCulled = false;
-          trunk.castShadow = b.li < 2;
-          trunk.receiveShadow = true;
-          trunk.count = 0;
-          this.group.add(trunk);
-          b.trunk = trunk;
+        b.meshes = [];
+        let first = null;
+        for (const p of b.parts) {
+          const im = new THREE.InstancedMesh(p.geometry, p.material, n);
+          if (first) { im.instanceMatrix = first.instanceMatrix; im.instanceColor = first.instanceColor; }
+          else im.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(n * 3), 3);
+          im.frustumCulled = false;
+          im.castShadow = p.cast;
+          im.receiveShadow = p.receive;
+          if (p.depth) im.customDepthMaterial = p.depth;
+          im.count = 0;
+          this.group.add(im);
+          b.meshes.push(im);
+          first = first || im;
         }
       }
     }
@@ -525,7 +535,7 @@ export class TreeSystem {
     const [d0, d1] = this.lodDist, maxD = this.maxDist;
     for (const key in this.variants) {
       const v = this.variants[key];
-      const counts = [0, 0, 0];
+      const counts = v.buckets.map(() => 0);
       for (const t of v.list) {
         const dx = t.x - p.x, dz = t.z - p.z, dy = t.y + t.h * 0.5 - p.y;
         const d = Math.sqrt(dx * dx + dz * dz + dy * dy * 0.5);
@@ -533,26 +543,23 @@ export class TreeSystem {
         sphere.center.set(t.x, t.y + t.h * 0.5, t.z);
         sphere.radius = Math.max(t.r, t.h * 0.6) + (d < d1 ? 22 : 0);
         if (!this.frustum.intersectsSphere(sphere)) continue;
-        const li = d < d0 ? 0 : d < d1 ? 1 : 2;
-        const b = v.buckets[li];
-        const i = counts[li]++;
-        t.m.toArray(b.leaves.instanceMatrix.array, i * 16);
-        t.c.toArray(b.leaves.instanceColor.array, i * 3);
+        const bi = v.lodMap[d < d0 ? 0 : d < d1 ? 1 : 2];
+        const m0 = v.buckets[bi].meshes[0];
+        const i = counts[bi]++;
+        t.m.toArray(m0.instanceMatrix.array, i * 16);
+        t.c.toArray(m0.instanceColor.array, i * 3);
       }
-      for (let li = 0; li < 3; li++) {
-        const b = v.buckets[li];
-        b.leaves.count = counts[li];
-        b.leaves.visible = counts[li] > 0;
-        b.leaves.instanceMatrix.needsUpdate = true;
-        b.leaves.instanceColor.needsUpdate = true;
-        if (b.trunk) { b.trunk.count = counts[li]; b.trunk.visible = counts[li] > 0; }
-      }
+      v.buckets.forEach((b, bi) => {
+        for (const im of b.meshes) { im.count = counts[bi]; im.visible = counts[bi] > 0; }
+        b.meshes[0].instanceMatrix.needsUpdate = true;
+        b.meshes[0].instanceColor.needsUpdate = true;
+      });
     }
   }
   stats() {
     let draws = 0, tris = 0;
-    for (const key in this.variants) for (const b of this.variants[key].buckets) {
-      for (const m of [b.leaves, b.trunk]) if (m && m.visible) { draws++; tris += (m.geometry.index.count / 3) * m.count; }
+    for (const key in this.variants) for (const b of this.variants[key].buckets) for (const m of b.meshes) {
+      if (m.visible) { draws++; tris += ((m.geometry.index ? m.geometry.index.count : m.geometry.attributes.position.count) / 3) * m.count; }
     }
     return { draws, tris };
   }
@@ -569,4 +576,9 @@ export function createTreeObject(mats, species = 'broadleaf', seed = 1, scale = 
   g.add(t, l);
   g.scale.setScalar(scale);
   return g;
+}
+
+/** Haze-only patch for static nature materials (rocks, logs). */
+export function hazePatch(mat, key) {
+  return patchMaterial(mat, { key, uniforms: { uHaze: HAZE.uHaze }, fragmentPars: HAZE_PARS, fragment: [['#include <opaque_fragment>', HAZE_FRAG, 'before']] });
 }

@@ -21,7 +21,9 @@ const waited = Math.round((Date.now() - start) / 1000);
 if (waited > 2) console.error(`lock: acquired after ${waited}s`);
 let code = 1;
 try {
-  const r = spawnSync(process.argv[2], process.argv.slice(3), { stdio: 'inherit', shell: true });
+  // node/python run without a shell so arguments containing & or quotes pass through untouched
+  const direct = /^(node|python)(\.exe)?$/i.test(process.argv[2]);
+  const r = spawnSync(process.argv[2], process.argv.slice(3), { stdio: 'inherit', shell: !direct });
   code = r.status ?? 1;
 } finally {
   try { fs.rmdirSync(lock); } catch {}

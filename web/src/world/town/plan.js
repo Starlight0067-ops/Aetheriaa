@@ -126,11 +126,11 @@ export function makePlan(houseDefs) {
     { x: POI.plaza.x, z: POI.plaza.z, r: POI.plaza.r + 0.2 },
     { x: POI.hall.x, z: POI.hall.z, r: 31 },
     { x: 15, z: 31, r: 9 }, { x: 8, z: 21, r: 7 },            // plaza view
-    { x: -50, z: 13, r: 7 }, { x: -46, z: 10, r: 6 },         // street view / gate square
+    { x: -50, z: 13, r: 7 }, { x: -46, z: 10, r: 5 },         // street view / gate square
     ...gates.map((g) => ({ x: g.x, z: g.z, r: 13 })),
   ];
   // gate square south of the main street (view corridor of the "street" camera)
-  const noHouseRegion = (x, z) => (x > -62 && x < -22 && z > 5 && z < 21) || (x > -16 && x < 18 && z > 18 && z < 44 && x > 2);
+  const noHouseRegion = (x, z) => (x > -62 && x < -41 && z > 5 && z < 21) || (x > -16 && x < 18 && z > 18 && z < 44 && x > 2);
 
   const placed = [];
   const obbs = [];
@@ -202,6 +202,26 @@ export function makePlan(houseDefs) {
     return d;
   };
 
+  // ---- street rows
+  for (const st of streets.filter((q) => q.name === 'main')) {
+    const L = polyLength(st.pts);
+    for (const side of [1, -1]) {
+      let s = st.kind === 'grand' ? 1 : 0.5;
+      let guard = 0;
+      while (s < L - 2 && guard++ < 200) {
+        const d = pick(9.8, st.name === 'main' || st.name === 'market');
+        if (!d) break;
+        const sm = sampleAt(st.pts, s + d.W / 2);
+        const off = st.w / 2 + 0.6;
+        const x = sm.x + sm.nx * side * off, z = sm.z + sm.nz * side * off;
+        // front faces the street: local +Z towards -normal*side
+        const yaw = Math.atan2(-sm.nx * side, -sm.nz * side);
+        const hh = tryHouse(d, x, z, yaw, st.name, { maxDrop: st.kind === 'grand' ? 10 : 8 });
+        s += hh ? d.W + (R() < 0.15 ? 1.2 : 0.06) : 1.0;
+      }
+    }
+  }
+
   // ---- plaza ring
   const ringArcs = [[-127, -63], [-40, -5], [18, 35], [110, 166], [-166, -149]];
   for (const [a0, a1] of ringArcs) {
@@ -222,7 +242,7 @@ export function makePlan(houseDefs) {
   }
 
   // ---- street rows
-  for (const st of streets) {
+  for (const st of streets.filter((q) => q.name !== 'main')) {
     const L = polyLength(st.pts);
     for (const side of [1, -1]) {
       let s = st.kind === 'grand' ? 1 : 0.5;

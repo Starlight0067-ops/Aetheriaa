@@ -242,11 +242,17 @@ export async function createPhysics(ctx, opts = {}) {
     get pending() { return queue.length; },
     poll, step, raycast, sphereCast, shapeCast, overlap, groundAt, setDebug,
     descriptorOf: (collider) => tagOf.get(collider?.handle) || null,
-    /** Per-frame: add new descriptors then step (keeps scene queries current). */
+    /** Force a step every frame (only needed if someone adds dynamic / kinematic bodies). */
+    alwaysStep: false,
+    /**
+     * Per-frame: add new descriptors, then step only when the static set changed (the step refreshes the BVH that
+     * every scene query uses). The character collider is excluded from all queries, so moving it needs no step.
+     */
     update(dt) {
       const before = built.size;
       poll(opts.budgetMs ?? 6);
-      step(dt);
+      if (dirty || api.alwaysStep || world.bodies.len() > 0) step(dt);
+      else stats.stepMs *= 0.9;
       if (debugLines && built.size !== before) setDebug(true);
     },
   };

@@ -27,21 +27,29 @@ page.on('pageerror', (e) => { if (!/pointer ?lock|NotAllowedError/i.test(String(
 
 await page.goto(`${base}/?autotest=${mode}&quality=${quality}`, { waitUntil: 'load' });
 const t0 = Date.now();
-let result = null;
-while (Date.now() - t0 < 240000) {
-  const s = await page.evaluate(() => {
-    const T = window.__AETHERIA_TEST;
-    return T ? { done: T.done, snap: T.snapRequest, snapDone: T.snapDone, err: window.__AETHERIA_ERROR } : { err: window.__AETHERIA_ERROR };
-  });
-  if (s.err) { errors.push(s.err); break; }
-  if (s.snap && s.snap !== s.snapDone) {
-    await page.waitForTimeout(150);
-    const file = path.join(out, `${s.snap}.png`);
-    await page.screenshot({ path: file });
-    console.log('screenshot', file);
-    await page.evaluate((n) => { window.__AETHERIA_TEST.snapDone = n; }, s.snap);
+let result = null, reloads = 0;
+page.on('framenavigated', (f) => { if (f === page.mainFrame()) reloads++; });
+while (Date.now() - t0 < 300000) {
+  try {
+    const s = await page.evaluate(() => {
+      const T = window.__AETHERIA_TEST;
+      return T ? { done: T.done, snap: T.snapRequest, snapDone: T.snapDone, err: window.__AETHERIA_ERROR } : { err: window.__AETHERIA_ERROR };
+    });
+    if (s.err) { errors.push(s.err); break; }
+    if (s.snap && s.snap !== s.snapDone) {
+      await page.waitForTimeout(150);
+      const file = path.join(out, `${s.snap}.png`);
+      await page.screenshot({ path: file });
+      console.log('screenshot', file);
+      await page.evaluate((n) => { window.__AETHERIA_TEST.snapDone = n; }, s.snap);
+    }
+    if (s.done) { result = await page.evaluate(() => window.__AETHERIA_TEST); break; }
+  } catch (e) {
+    // Vite full reloads (another agent saved a file) destroy the context; the page restarts the test from the URL.
+    if (!/context was destroyed|navigation|Target closed/i.test(String(e)) || reloads > 6) throw e;
+    console.log('page reloaded (dev server HMR) — test restarts');
+    await page.waitForLoadState('load').catch(() => {});
   }
-  if (s.done) { result = await page.evaluate(() => window.__AETHERIA_TEST); break; }
   await page.waitForTimeout(100);
 }
 await page.screenshot({ path: path.join(out, 'final.png') });

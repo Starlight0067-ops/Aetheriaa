@@ -9,7 +9,7 @@ export const POI = {
   westGate:  { x: -64,  z: 3,    y: 15 },            // town gate at the end of the bridge
   bridge:    { x0: -132, x1: -62, z: 3, deckY: 15, width: 8 },   // arched stone viaduct over the river valley
   southGate: { x: 10,   z: 112,  y: 14 },
-  spawn:     { x: 0,    z: 34 },
+  spawn:     { x: 0,    z: 15 },     // south edge of the plaza paving (clear of houses)
   core:      { x: 245,  z: -150 },                    // the Elyndra Core: giant crystal spire, landmark
   windmills: [{ x: -190, z: -48 }, { x: -168, z: 78 }, { x: -236, z: 22 }],
   lake:      { x: 165,  z: -235, r: 70, y: 11 },
@@ -37,7 +37,7 @@ export const VIEWS = {
   bridge:   { pos: [-170, 40, 55], target: [-100, 15, 3], fov: 50 },
   hall:     { pos: [1, 27, -8], target: [52, 49, -54], fov: 55 },
   meadow:   { pos: [-128, 23, 44], target: [-200, 33, 0], fov: 55 },
-  portrait: { follow: 'player', offset: [0, 1.55, 1.0], look: [0, 1.5, 0], fov: 32 },
+  portrait: { follow: 'player', offset: [0, 1.6, 1.0], look: [0, 1.57, 0], fov: 32 },
   fullbody: { follow: 'player', offset: [0, 1.05, 3.3], look: [0, 0.92, 0], fov: 40 },
 };
 

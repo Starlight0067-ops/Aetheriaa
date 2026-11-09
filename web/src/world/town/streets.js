@@ -103,7 +103,7 @@ export function buildStreets(streets, mats, opts = {}) {
       }
       // curbs + skirts on both sides
       for (const side of [-1, 1]) {
-        const cw = st.kind === 'grand' ? 0.55 : 0.28, chh = st.kind === 'grand' ? 0.75 : 0.14;
+        const cw = st.kind === 'grand' ? 1.3 : 0.28, chh = st.kind === 'grand' ? 0.85 : 0.14;
         const o0 = hw, o1 = hw + cw;
         const P = (q, y, o) => [q.x + q.nx * o * side, y, q.z + q.nz * o * side];
         const ta = ya + chh, tb = yb + chh;
@@ -195,4 +195,120 @@ export function buildPlaza(mats) {
   const m2 = new THREE.Mesh(deco.geometry(), mats.stone);
   m1.receiveShadow = m2.receiveShadow = true;
   return [m1, m2];
+}
+
+/** Wide stone steps filling a sector between the plaza and higher ground (the slope under the plaza view).
+ *  Every (ring, angular cell) gets its own quantised height so the flight hugs the hillside like a stepped
+ *  amphitheatre: risers face the plaza, small side risers appear where the hill rises across the sector.
+ *  sector: { cx, cz, y0, a0, a1 (radians), r0, r1 } */
+export function buildSteps(mats, sec) {
+  const top = new GeoBuf(), edge = new GeoBuf(), col = new GeoBuf();
+  const N = Math.max(8, Math.round((sec.a1 - sec.a0) * 28));
+  const dr = 0.5;
+  const rings = [];
+  for (let r = sec.r0; r < sec.r1 - 1e-6; r += dr) rings.push(r);
+  rings.push(sec.r1);
+  const A = (k) => sec.a0 + (sec.a1 - sec.a0) * k / N;
+  const P = (r, a, y) => [sec.cx + r * Math.cos(a), y, sec.cz + r * Math.sin(a)];
+  const tH = (r, a) => { const p = P(r, a, 0); return heightAt(p[0], p[2]); };
+  const H = [];
+  for (let i = 0; i < rings.length - 1; i++) {
+    H.push([]);
+    for (let k = 0; k < N; k++) {
+      let h = -Infinity;
+      for (const rr of [rings[i], rings[i + 1]]) for (const aa of [A(k), A(k + 1)]) h = Math.max(h, tH(rr, aa));
+      h = Math.max(h + 0.14, sec.y0 + 0.05, i ? H[i - 1][k] : -Infinity);
+      H[i].push(sec.y0 + Math.ceil((h - sec.y0) / RISE - 1e-6) * RISE);
+    }
+  }
+  const out = (a) => [Math.cos(a), 0, Math.sin(a)];
+  const tang = (a) => [-Math.sin(a), 0, Math.cos(a)];
+  for (let i = 0; i < H.length; i++) {
+    const ra = rings[i], rb = rings[i + 1];
+    for (let k = 0; k < N; k++) {
+      const a0 = A(k), a1 = A(k + 1), y = H[i][k];
+      const yPrev = i ? H[i - 1][k] : sec.y0;
+      top.toward([P(ra, a0, y), P(ra, a1, y), P(rb, a1, y), P(rb, a0, y)], UP, 'xz', 1);
+      const am = (a0 + a1) / 2, inward = out(am).map((v) => -v);
+      if (y - yPrev > 0.01) {
+        edge.toward([P(ra, a0, yPrev), P(ra, a1, yPrev), P(ra, a1, y), P(ra, a0, y)], inward, 'wall', 0.82);
+        edge.toward([P(ra - 0.05, a0, y + 0.025), P(ra - 0.05, a1, y + 0.025), P(ra + 0.14, a1, y + 0.025), P(ra + 0.14, a0, y + 0.025)], UP, 'xz', 1.12);
+      }
+      if (k + 1 < N) {
+        const yn = H[i][k + 1];
+        if (Math.abs(yn - y) > 0.01) {
+          const lo = Math.min(y, yn), hi = Math.max(y, yn);
+          const dir = yn > y ? tang(a1).map((v) => -v) : tang(a1);
+          edge.toward([P(ra, a1, lo), P(rb, a1, lo), P(rb, a1, hi), P(ra, a1, hi)], dir, 'wall', 0.85);
+        }
+      }
+    }
+    // side cheek walls with a low parapet
+    for (const [k, a, sgn] of [[0, sec.a0, -1], [N - 1, sec.a1, 1]]) {
+      const y = H[i][k];
+      const tg = tang(a).map((v) => v * sgn);
+      const ga = Math.min(tH(ra, a), y) - 0.6, gb = Math.min(tH(rb, a), y) - 0.6;
+      const ai = a - sgn * 0.42 / ((ra + rb) / 2);
+      edge.toward([P(ra, a, ga), P(rb, a, gb), P(rb, a, y + 0.5), P(ra, a, y + 0.5)], tg, 'wall', [0.7, 0.7, 1, 1]);
+      edge.toward([P(ra, ai, y), P(rb, ai, y), P(rb, ai, y + 0.5), P(ra, ai, y + 0.5)], tg.map((v) => -v), 'wall', 0.9);
+      edge.toward([P(ra, a, y + 0.5), P(rb, a, y + 0.5), P(rb, ai, y + 0.5), P(ra, ai, y + 0.5)], UP, 'xz', 1.06);
+      const yNext = i + 1 < H.length ? H[i + 1][k] : y;
+      const yPrev = i ? H[i - 1][k] : sec.y0 - 0.5;
+      if (yNext > y) edge.toward([P(rb, a, y + 0.5), P(rb, ai, y + 0.5), P(rb, ai, yNext + 0.5), P(rb, a, yNext + 0.5)], out(a).map((v) => -v), 'wall', 0.85);
+      if (!i) edge.toward([P(ra, a, yPrev), P(ra, ai, yPrev), P(ra, ai, y + 0.5), P(ra, a, y + 0.5)], out(a).map((v) => -v), 'wall', 0.85);
+    }
+  }
+  // outer rim
+  const last = H[H.length - 1];
+  for (let k = 0; k < N; k++) {
+    const a0 = A(k), a1 = A(k + 1), y = last[k];
+    edge.toward([P(sec.r1, a0, Math.min(y, tH(sec.r1, a0)) - 0.6), P(sec.r1, a1, Math.min(y, tH(sec.r1, a1)) - 0.6), P(sec.r1, a1, y), P(sec.r1, a0, y)], out((a0 + a1) / 2), 'wall', [0.7, 0.7, 1, 1]);
+  }
+  // collider: coarse ramp along the cells
+  for (let i = 0; i < H.length; i += 2) {
+    const j = Math.min(H.length - 1, i + 2);
+    for (let k = 0; k < N; k += 4) {
+      const k2 = Math.min(N, k + 4);
+      const ya = H[i][Math.min(k, N - 1)], yb = H[j][Math.min(k, N - 1)];
+      col.toward([P(rings[i], A(k), ya), P(rings[i], A(k2), ya), P(rings[j + 1], A(k2), yb), P(rings[j + 1], A(k), yb)], UP);
+    }
+  }
+  const meshes = [new THREE.Mesh(top.geometry(), mats.cobble), new THREE.Mesh(edge.geometry(), mats.stone)];
+  meshes.forEach((m) => { m.receiveShadow = true; });
+  meshes[1].castShadow = true;
+  const cm = new THREE.Mesh(col.geometry());
+  cm.name = 'collider_steps';
+  const heightAtCell = (x, z) => {
+    const r = Math.hypot(x - sec.cx, z - sec.cz), a = Math.atan2(z - sec.cz, x - sec.cx);
+    const i = Math.min(H.length - 1, Math.max(0, Math.floor((r - sec.r0) / dr)));
+    const k = Math.min(N - 1, Math.max(0, Math.floor((a - sec.a0) / (sec.a1 - sec.a0) * N)));
+    return H[i][k];
+  };
+  return { meshes, collider: { kind: 'mesh', object: cm }, heightAtCell };
+}
+
+/** Cobbled paving that hugs the terrain inside a polygon [[x,z],...] (squares, forecourts). */
+export function buildPaving(mats, poly, step = 1.0, lift = 0.16) {
+  const top = new GeoBuf();
+  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+  for (const [x, z] of poly) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+  const inside = (x, z) => {
+    let c = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const [xi, zi] = poly[i], [xj, zj] = poly[j];
+      if (((zi > z) !== (zj > z)) && (x < (xj - xi) * (z - zi) / (zj - zi) + xi)) c = !c;
+    }
+    return c;
+  };
+  const h = (x, z) => heightAt(x, z) + lift;
+  for (let x = x0; x < x1; x += step) {
+    for (let z = z0; z < z1; z += step) {
+      if (!inside(x + step / 2, z + step / 2)) continue;
+      const P = [[x, h(x, z), z], [x + step, h(x + step, z), z], [x + step, h(x + step, z + step), z + step], [x, h(x, z + step), z + step]];
+      top.toward(P, UP, 'xz', 1);
+    }
+  }
+  const m = new THREE.Mesh(top.geometry(), mats.cobble);
+  m.receiveShadow = true;
+  return m;
 }

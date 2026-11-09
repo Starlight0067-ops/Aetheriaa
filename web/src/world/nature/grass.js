@@ -6,7 +6,8 @@ import * as THREE from 'three';
 import { heightAt } from '../../core/layout.js';
 import { createToonMaterial } from '../../render/toon.js';
 import { mulberry32, hash2i, vnoise, patchMaterial, WIND, WIND_GLSL, sstep } from './common.js';
-import { splatAt, isWater, slopeAt, inTown, heightFast, dTown } from './worlddata.js';
+import { splatAt, isWater, slopeAt, inTown, heightFast, dTown, streetDist } from './worlddata.js';
+import { POI, TOWN } from '../../core/layout.js';
 
 const TILE = 12;
 
@@ -230,6 +231,32 @@ export function createGrass(ctx, tex, splatB, gardens) {
   const ggeo = clumpGeometry(low ? 5 : 7, 3, mulberry32(9));
   const spacing = 1 / Math.sqrt(dens);
   const inGarden = (x, z) => gardens.some((g) => Math.hypot(x - g.x, z - g.z) < g.r);
+  // building / wall footprints from the static box colliders (town module), hashed lazily on first use
+  let boxHash = null;
+  const BC = 16;
+  const buildBoxHash = () => {
+    boxHash = new Map();
+    for (const c of ctx.colliders) {
+      if (c.kind !== 'box' || !c.half) continue;
+      if (c.half[0] < 0.6 && c.half[2] < 0.6) continue; // tree trunks etc.
+      const r = Math.hypot(c.half[0], c.half[2]) + 1;
+      for (let i = Math.floor((c.center[0] - r) / BC); i <= Math.floor((c.center[0] + r) / BC); i++)
+        for (let j = Math.floor((c.center[2] - r) / BC); j <= Math.floor((c.center[2] + r) / BC); j++) {
+          const k = i + ',' + j; if (!boxHash.has(k)) boxHash.set(k, []); boxHash.get(k).push(c);
+        }
+    }
+  };
+  const inFootprint = (x, z) => {
+    if (!boxHash) buildBoxHash();
+    const list = boxHash.get(Math.floor(x / BC) + ',' + Math.floor(z / BC));
+    if (!list) return false;
+    for (const c of list) {
+      const a = -(c.rotationY || 0), dx = x - c.center[0], dz = z - c.center[2];
+      const lx = dx * Math.cos(a) - dz * Math.sin(a), lz = dx * Math.sin(a) + dz * Math.cos(a);
+      if (Math.abs(lx) < c.half[0] + 0.7 && Math.abs(lz) < c.half[2] + 0.7) return true;
+    }
+    return false;
+  };
   const genGrass = (ti, tj) => {
     const rnd = mulberry32((ti * 73856093) ^ (tj * 19349663));
     const items = [];
@@ -238,7 +265,9 @@ export function createGrass(ctx, tex, splatB, gardens) {
     for (let a = 0; a < n; a++) for (let b = 0; b < n; b++) {
       const x = ti * TILE + (a + rnd()) * spacing, z = tj * TILE + (b + rnd()) * spacing;
       const garden = inGarden(x, z);
-      if (!garden && inTown(x, z)) continue;
+      const town = inTown(x, z);
+      if (town && !garden && (streetDist(x, z) < 3.2 || Math.hypot(x - POI.plaza.x, z - POI.plaza.z) < POI.plaza.r + 3 || rnd() > 0.7)) continue;
+      if ((town || dTown(x, z) < TOWN.radius + 6) && inFootprint(x, z)) continue;
       if (isWater(x, z, 0.35)) continue;
       const s = splatAt(x, z);
       if (s.cobble > 0.25 || s.sand > 0.45) continue;
@@ -252,7 +281,7 @@ export function createGrass(ctx, tex, splatB, gardens) {
       const e = 0.6;
       const hx = heightAt(x + e, z) - heightAt(x - e, z), hz = heightAt(x, z + e) - heightAt(x, z - e);
       const L = Math.hypot(hx, 2 * e, hz);
-      const scale = (0.75 + rnd() * 0.5) * (0.6 + 0.4 * pathEdge) * (1 + s.meadow * 0.25) * (1 - s.forest * 0.3) * (1 - s.town * 0.35) * (1 - s.damp * 0.15);
+      const scale = (0.75 + rnd() * 0.5) * (0.6 + 0.4 * pathEdge) * (1 + s.meadow * 0.25) * (1 - s.forest * 0.3) * (town ? 0.5 : 1) * (1 - s.damp * 0.15);
       items.push([rnd(), x, y - 0.03, z, scale, rnd() * 6.283, -hx / L, -hz / L]);
       if (y < minY) minY = y; if (y + 1 > maxY) maxY = y + 1;
     }

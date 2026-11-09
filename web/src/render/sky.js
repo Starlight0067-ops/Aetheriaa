@@ -168,19 +168,27 @@ function installFog(THREE, sunDir, glow, q) {
     uniform float fogFar;
   #endif
 #endif`;
-  // exponential height fog (analytic integral along the view ray) + far-plane hide band + sun haze
+  // Aerial perspective = (a) distance haze that decays only slowly with altitude (scale height q.aerH), with a
+  // quadratic ramp past q.aerStart so the town stays crisp while far ridges recede, + (b) low valley mist
+  // (exponential height fog, analytic ray integral) + (c) far-plane hide band. The haze colour follows the sky
+  // gradient by view elevation so peaks fade into the blue behind them; hazed colour also loses saturation.
   THREE.ShaderChunk.fog_fragment = /* glsl */`
 #ifdef USE_FOG
   {
     vec3 fRay = vFogWorldOffset;
     float fDist = length( fRay );
     vec3 fDir = fRay / max( fDist, 1e-4 );
-    const float fK = ${q.falloff.toFixed(5)};
-    float fCamH = max( cameraPosition.y - ${q.base.toFixed(2)}, -20.0 );
+    float fAlt = max( cameraPosition.y + fRay.y * 0.5, 0.0 );
+    float fS = max( fDist - ${q.aerStart.toFixed(1)}, 0.0 ) / ${q.aerRange.toFixed(1)};
+    float fOD = ( ${q.aerLin.toFixed(6)} * fDist + ${q.aerQuad.toFixed(4)} * fS * fS ) * exp( -fAlt / ${q.aerH.toFixed(1)} );
+    const float fK = ${q.mistFalloff.toFixed(5)};
+    float fCamH = max( cameraPosition.y, 0.0 );
     float fDY = fRay.y;
     float fH = abs( fDY ) > 0.05 ? ( exp( -fK * fCamH ) - exp( -fK * ( fCamH + fDY ) ) ) / ( fK * fDY ) : exp( -fK * ( fCamH + fDY * 0.5 ) );
-    float fOD = ${q.density.toFixed(6)} * max( fDist - ${q.start.toFixed(1)}, 0.0 ) * fH;
-    float fogFactor = 1.0 - exp( -fOD );
+    // soft cap: distant ridges keep ~30% of their contrast as blue silhouettes
+    float fogFactor = ${q.cap.toFixed(3)} * ( 1.0 - exp( -fOD / ${q.cap.toFixed(3)} ) );
+    float fMist = ${q.mist.toFixed(6)} * max( fDist - 30.0, 0.0 ) * fH;
+    fogFactor = 1.0 - ( 1.0 - fogFactor ) * exp( -fMist );
     #ifdef FOG_EXP2
       fogFactor = max( fogFactor, 1.0 - exp( - fogDensity * fogDensity * fDist * fDist ) );
     #else
@@ -188,7 +196,10 @@ function installFog(THREE, sunDir, glow, q) {
     #endif
     fogFactor = min( fogFactor, 1.0 );
     float fSd = max( dot( fDir, vec3( ${d.x.toFixed(4)}, ${d.y.toFixed(4)}, ${d.z.toFixed(4)} ) ), 0.0 );
-    vec3 fCol = fogColor + ${v(glow)} * ( pow( fSd, 6.0 ) * 0.22 + pow( fSd, 2.5 ) * 0.12 );
+    vec3 fCol = mix( fogColor, ${v(q.hazeHigh)}, smoothstep( 0.0, 0.4, fDir.y ) * 0.6 );
+    fCol += ${v(glow)} * ( pow( fSd, 6.0 ) * 0.22 + pow( fSd, 2.5 ) * 0.12 );
+    float fL = dot( gl_FragColor.rgb, vec3( 0.2126, 0.7152, 0.0722 ) );
+    gl_FragColor.rgb = mix( gl_FragColor.rgb, vec3( fL ), fogFactor * 0.4 );
     gl_FragColor.rgb = mix( gl_FragColor.rgb, fCol, fogFactor );
   }
 #endif`;
@@ -211,10 +222,12 @@ export async function create(ctx) {
 
   const far = camera.far;
   installFog(THREE, sunDir, colors.sunGlow, {
-    density: quality.name === 'low' ? 0.0021 : 0.0017, falloff: 1 / 55, base: 0, start: 25,
+    aerLin: 0.00045, aerQuad: 1.2, aerStart: 220, aerRange: 160, aerH: 400, cap: 0.72,
+    mist: 0.004, mistFalloff: 1 / 18,
+    hazeHigh: colors.horizon.clone().lerp(colors.mid, 0.4),
   });
   scene.background = colors.fog.clone();
-  scene.fog = new THREE.Fog(colors.fog.clone(), far * 0.5, far * 0.97);
+  scene.fog = new THREE.Fog(colors.fog.clone(), far * 0.86, far * 0.99);
 
   const skyUniforms = {
     uSkyZen: { value: colors.zenith }, uSkyMid: { value: colors.mid }, uSkyHor: { value: colors.horizon },
@@ -278,16 +291,19 @@ export async function create(ctx) {
     const aCard = new Float32Array(count * 4), aCell = new Float32Array(count * 4);
     let s = 777;
     const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+    // The valley is ringed by tall rim mountains (skyline ~25-45° from town), so most cumulus sit above that
+    // line; a few low banks remain for views from the ridges.
     for (let i = 0; i < count; i++) {
-      const big = i < count * 0.6;
-      const az = (i / count) * Math.PI * 2 * 3.0 + rnd() * 0.9;    // spread round the horizon
-      const halfW = THREE.MathUtils.degToRad(big ? 16 + rnd() * 14 : 7 + rnd() * 7);
+      const tier = i < count * 0.2 ? 0 : (i < count * 0.65 ? 1 : 2);
+      const az = (i / count) * Math.PI * 2 * 3.0 + rnd() * 0.9;    // spread round the sky
+      const wDeg = tier === 0 ? 16 + rnd() * 12 : tier === 1 ? 11 + rnd() * 9 : 5.5 + rnd() * 5;
+      const halfW = THREE.MathUtils.degToRad(wDeg);
       const halfH = Math.atan(Math.tan(halfW) * 0.5);
-      const baseEl = THREE.MathUtils.degToRad(big ? 1.5 + rnd() * 9 : 14 + rnd() * 22);
-      const el = baseEl + halfH * 0.64;
+      const eDeg = tier === 0 ? 2 + rnd() * 8 : tier === 1 ? 17 + rnd() * 17 : 36 + rnd() * 22;
+      const el = THREE.MathUtils.degToRad(eDeg) + halfH * 0.64;
       aCard.set([az, el, halfW, halfH], i * 4);
       const cell = Math.floor(rnd() * 8);
-      aCell.set([cell % 2, Math.floor(cell / 2), rnd() < 0.5 ? 1 : -1, big ? 1 : 0.85], i * 4);
+      aCell.set([cell % 2, Math.floor(cell / 2), rnd() < 0.5 ? 1 : -1, tier === 2 ? 0.9 : 1], i * 4);
     }
     g.setAttribute('aCard', new THREE.InstancedBufferAttribute(aCard, 4));
     g.setAttribute('aCell', new THREE.InstancedBufferAttribute(aCell, 4));

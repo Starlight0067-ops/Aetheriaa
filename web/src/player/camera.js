@@ -147,9 +147,10 @@ export class CameraRig {
     this.position.copy(pos);
     this.target.copy(sp);
 
-    // hide the character when the camera is jammed into it
+    // hide the character when the gameplay camera is jammed into it (never in locked / screenshot views,
+    // where the real camera is placed by someone else)
     const vis = this.player.visual;
-    if (vis && vis.pivot) vis.pivot.visible = pos.distanceTo(head) > 0.55;
+    if (vis && vis.pivot) vis.pivot.visible = this.ctx.cameraLocked || pos.distanceTo(head) > 0.55;
 
     if (this.ctx.cameraLocked) return;
     const cam = this.camera;

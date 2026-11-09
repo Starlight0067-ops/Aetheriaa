@@ -15,6 +15,7 @@
 // -> procedural fallback (idle/walk/run/sprint/fall), so nothing is ever static.
 import * as THREE from 'three';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { createToonMaterial, createOutline } from '../render/toon.js';
 import { ACTIONS } from './names.js';
 import { NormalizedRig, VRMRigAdapter, detectHumanBones } from './humanoid.js';
@@ -27,6 +28,7 @@ import { CATALOG } from './catalog.js';
 export { ACTIONS, CATALOG };
 
 export async function createCharacter(ctx, id, opts = {}) {
+  const TARGET_HEIGHT = { kael: 1.75, lyra: 1.62, maren: 1.67, wenna: 1.58, toma: 1.48, ostin: 1.68, hesk: 1.86, veyra: 1.72 };
   const object = new THREE.Group();
   object.name = `character_${id}`;
   const pivot = new THREE.Group();          // models face +Z (VRM 1.0 / glTF); turn them to face -Z
@@ -48,6 +50,12 @@ export async function createCharacter(ctx, id, opts = {}) {
   }
   if (!model) model = placeholderModel(info);
   pivot.add(model.scene);
+  // normalise the free VRoid models to the cast's heights (anime proportions, metres)
+  const targetH = opts.height ?? TARGET_HEIGHT[id];
+  if (targetH && model.height > 0.5 && Math.abs(model.height - targetH) > 0.02) {
+    pivot.scale.setScalar(targetH / model.height);
+    model.height = targetH;
+  }
   if (opts.shadows !== false) model.scene.traverse((o) => { if (o.isMesh && !o.userData.isOutline) o.castShadow = true; });
 
   // ---- animation clips: retargeted files first, procedural for the rest
@@ -83,11 +91,12 @@ export async function createCharacter(ctx, id, opts = {}) {
     let yaw = 0, pitch = 0;
     const t = look.target;
     if (t) {
+      // measure in the pivot frame, where every model (VRM0 after rotateVRM0, VRM1, GLB) faces +Z
       const p = t.isObject3D ? t.getWorldPosition(tmpV) : tmpV.copy(t);
-      model.scene.updateMatrixWorld();
+      pivot.updateMatrixWorld(true);
       head.updateWorldMatrix(true, false);
       const hp = new THREE.Vector3().setFromMatrixPosition(head.matrixWorld);
-      model.scene.worldToLocal(p); model.scene.worldToLocal(hp);
+      pivot.worldToLocal(p); pivot.worldToLocal(hp);
       const d = p.sub(hp);
       yaw = Math.atan2(d.x, d.z); pitch = -Math.atan2(d.y, Math.hypot(d.x, d.z));
       if (Math.abs(yaw) > 1.9) yaw = 0, pitch = 0;          // behind: don't break the neck
@@ -102,12 +111,72 @@ export async function createCharacter(ctx, id, opts = {}) {
     look.yaw += (yaw - look.yaw) * k; look.pitch += (pitch - look.pitch) * k;
     const neck = model.rig.node('neck');
     const split = neck ? 0.4 : 0;
-    if (neck) neck.quaternion.premultiply(tmpQ.setFromEuler(tmpE.set(look.pitch * split, look.yaw * split, 0)));
-    head.quaternion.premultiply(tmpQ.setFromEuler(tmpE.set(look.pitch * (1 - split), look.yaw * (1 - split), 0)));
+    // VRM0 normalized bones live in a frame turned 180 deg about Y: yaw is unchanged, pitch mirrors
+    const pf = model.rig.isVRM0 ? -1 : 1;
+    if (neck) neck.quaternion.premultiply(tmpQ.setFromEuler(tmpE.set(look.pitch * split * pf, look.yaw * split, 0)));
+    head.quaternion.premultiply(tmpQ.setFromEuler(tmpE.set(look.pitch * (1 - split) * pf, look.yaw * (1 - split), 0)));
   }
 
+  // ---- post-animation layer (look-at + foot grounding). three's PropertyMixer skips writing a node whose
+  // blended value did not change, so the layer restores the pre-layer pose first; otherwise held poses
+  // (dt = 0, clamped one-shots) would accumulate the additive rotations frame after frame.
+  const post = { saved: false, neck: new THREE.Quaternion(), head: new THREE.Quaternion(), hips: new THREE.Vector3(), groundW: 1, offset: 0 };
+  const rigNode = (h) => model.rig?.node(h) || null;
+  const GROUNDED = new Set(['idle', 'walk', 'run', 'sprint', 'talk', 'wave', 'interact', 'attack1', 'attack2', 'attack3', 'cast', 'hit', 'land']);
+  const contacts = [];
+  if (model.rig) {
+    // rest heights of the ankle and toe joints above the model origin (rig is still in its rest pose here)
+    model.scene.updateMatrixWorld(true);
+    const base = model.scene;
+    for (const h of ['leftFoot', 'rightFoot', 'leftToes', 'rightToes']) {
+      const n = rigNode(h); if (!n) continue;
+      const p = base.worldToLocal(n.getWorldPosition(new THREE.Vector3()));
+      contacts.push({ node: n, rest: Math.max(0, p.y) });
+    }
+  }
+  function restorePost() {
+    if (!post.saved) return;
+    rigNode('neck')?.quaternion.copy(post.neck);
+    rigNode('head')?.quaternion.copy(post.head);
+    rigNode('hips')?.position.copy(post.hips);
+  }
+  function savePost() {
+    const n = rigNode('neck'), h = rigNode('head'), hp = rigNode('hips');
+    if (n) post.neck.copy(n.quaternion);
+    if (h) post.head.copy(h.quaternion);
+    if (hp) post.hips.copy(hp.position);
+    post.saved = true;
+  }
+  const _gp = new THREE.Vector3();
+  function applyGrounding(dt) {
+    const hips = rigNode('hips');
+    if (!hips || !contacts.length || !animator) return;
+    const cur = animator.current;
+    const want = animator.grounded && animator.airW < 0.05 && GROUNDED.has(cur) && !animator.forcedNoGround ? 1 : 0;
+    post.groundW += (want - post.groundW) * Math.min(1, (dt > 0 ? dt : 1 / 30) * 8);
+    if (post.groundW < 0.01) return;
+    model.scene.updateMatrixWorld(true);
+    let lowest = Infinity;
+    for (const c of contacts) {
+      const y = model.scene.worldToLocal(c.node.getWorldPosition(_gp)).y - c.rest;
+      if (y < lowest) lowest = y;
+    }
+    if (!isFinite(lowest)) return;
+    const s = (model.rig.hipsHeight || 0.9) / 0.9;
+    const delta = THREE.MathUtils.clamp(-lowest, -0.14 * s, 0.14 * s) * post.groundW;
+    // hips live in the normalized root frame, whose +Y is the model's +Y (VRM0 frames only mirror X/Z)
+    hips.position.y += delta;
+    post.offset = delta;
+  }
+
+  let ticks = 0;
+  const lastPos = new THREE.Vector3();
+  const curPos = new THREE.Vector3();
   function tick(dt) {
+    restorePost();
     if (animator) animator.update(dt);
+    savePost();
+    applyGrounding(dt);
     applyLook(dt);
     // blink (skipped while an explicit blink/happy expression is set)
     blinkT -= dt;
@@ -117,6 +186,10 @@ export async function createCharacter(ctx, id, opts = {}) {
     model.setExpressions?.({ ...expr, blink: Math.max(expr.blink || 0, blink) });
     model.rig?.update();
     model.update?.(dt);
+    // spring bones: settle against the posed skeleton on the first tick and after teleports (> 2 m in a frame)
+    object.getWorldPosition(curPos);
+    if (ticks++ === 0 || curPos.distanceToSquared(lastPos) > 4) { model.vrm?.springBoneManager?.reset(); }
+    lastPos.copy(curPos);
   }
 
   let manual = false;
@@ -180,6 +253,8 @@ async function loadVRMModel(ctx, url, { low, info }) {
     o.frustumCulled = false;
     for (const m of Array.isArray(o.material) ? o.material : [o.material]) tuneMToon(m, o, { sheen, shadowTint, low, info });
   });
+  const merged = mergeSkinnedByMaterial(vrm.scene);
+  if (merged) console.info(`[characters] ${url}: merged ${merged} skinned meshes by material`);
   vrm.scene.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(vrm.scene);
   const rig = new VRMRigAdapter(vrm);
@@ -193,6 +268,47 @@ async function loadVRMModel(ctx, url, { low, info }) {
     },
     update(dt) { if (low && vrm.springBoneManager) { vrm.humanoid.update(); vrm.expressionManager?.update(); return; } vrm.update(dt); },
   };
+}
+
+/**
+ * VRoid exports split one character into ~70-100 skinned meshes. Meshes that share a material, skeleton,
+ * bind matrix and attribute layout (and carry no morph targets: the face keeps its expressions) are merged
+ * into one SkinnedMesh per material, cutting draw calls (and shadow draws) by roughly 3x.
+ * Returns how many meshes were removed.
+ */
+function mergeSkinnedByMaterial(root) {
+  const groups = new Map();
+  root.traverse((o) => {
+    if (!o.isSkinnedMesh || Array.isArray(o.material) || !o.parent) return;
+    if (o.morphTargetInfluences?.length || o.geometry.morphAttributes?.position?.length) return;
+    const key = `${o.material.uuid}|${o.skeleton.uuid}|${o.parent.uuid}|${o.renderOrder}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(o);
+  });
+  let removed = 0;
+  for (const list of groups.values()) {
+    if (list.length < 2) continue;
+    const first = list[0];
+    const layout = (g) => Object.keys(g.attributes).sort().map((k) => `${k}:${g.attributes[k].itemSize}:${g.attributes[k].array.constructor.name}`).join('|') + (g.index ? ':i' : '');
+    const ref = layout(first.geometry);
+    if (!list.every((m) => m.bindMatrix.equals(first.bindMatrix) && m.matrix.equals(first.matrix) && layout(m.geometry) === ref)) continue;
+    const geo = mergeGeometries(list.map((m) => m.geometry), false);
+    if (!geo) continue;
+    const mesh = new THREE.SkinnedMesh(geo, first.material);
+    mesh.name = first.name + '_merged';
+    mesh.castShadow = first.castShadow;
+    mesh.receiveShadow = first.receiveShadow;
+    mesh.frustumCulled = first.frustumCulled;
+    mesh.renderOrder = first.renderOrder;
+    mesh.position.copy(first.position);
+    mesh.quaternion.copy(first.quaternion);
+    mesh.scale.copy(first.scale);
+    mesh.bind(first.skeleton, first.bindMatrix);
+    first.parent.add(mesh);
+    for (const m of list) m.removeFromParent();
+    removed += list.length - 1;
+  }
+  return removed;
 }
 
 /** Studio anime look for VRoid MToon materials. */

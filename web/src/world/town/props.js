@@ -233,35 +233,7 @@ export function placeProps(ctx, plan, piece, batch, dyn) {
   dyn.signs ||= [];
   const W = ctx.systems.world;
 
-  // ---- plaza: three market stalls, benches, lamps and crates
-  const stallAngles = [0.55, 2.45, 4.35];
-  for (const a of stallAngles) {
-    const r = 15.8;
-    const x = POI.plaza.x + Math.cos(a) * r;
-    const z = POI.plaza.z + Math.sin(a) * r;
-    // stall front (+Z) faces the fountain
-    const yaw = Math.atan2(-Math.cos(a), -Math.sin(a));
-    const y = heightAt(x, z);
-    add(batch, 'stall', x, y, z, yaw, tints(R), 0.96 + R() * 0.08);
-    ctx.colliders.push({ kind: 'box', center: [x, y + 0.95, z], half: [1.45, 0.95, 0.82], rotationY: yaw });
-    // wares around the stall
-    for (let k = 0; k < 3; k++) {
-      const aa = a + (k - 1) * 0.16 + 0.26;
-      const px = POI.plaza.x + Math.cos(aa) * (r + 1.15);
-      const pz = POI.plaza.z + Math.sin(aa) * (r + 1.15);
-      if (!goodSpot(plan, px, pz, -0.2)) continue;
-      const kind = k === 1 ? 'barrel' : 'crate';
-      add(batch, kind, px, heightAt(px, pz), pz, R() * 6.28, tints(R), 0.86 + R() * 0.14);
-    }
-    const bx = x - Math.sin(yaw) * 1.5, bz = z - Math.cos(yaw) * 1.5;
-    add(batch, 'bench', bx, heightAt(bx, bz), bz, yaw, tints(R));
-  }
-  for (const [a, r] of [[0.05, 9.6], [2.15, 9.6], [4.25, 9.6]]) {
-    const x = POI.plaza.x + Math.cos(a) * r, z = POI.plaza.z + Math.sin(a) * r;
-    const yaw = Math.atan2(-Math.cos(a), -Math.sin(a));
-    add(batch, 'bench', x, heightAt(x, z), z, yaw, tints(R));
-    ctx.colliders.push({ kind: 'box', center: [x, heightAt(x, z) + 0.35, z], half: [0.9, 0.35, 0.3], rotationY: yaw });
-  }
+  const stallAngles = [];   // plaza market ring lives in plazadress.js
   for (const a of [1.4, 3.25, 5.15]) {
     const r = POI.plaza.r - 2.3;
     const x = POI.plaza.x + Math.cos(a) * r, z = POI.plaza.z + Math.sin(a) * r;
@@ -345,3 +317,5 @@ export function placeProps(ctx, plan, piece, batch, dyn) {
   if (W?.town) W.town.props = { lamps: dyn.lanterns.length, shopProps, stalls: stallAngles.length };
   return { lamps: dyn.lanterns.length, shopProps };
 }
+
+export { pieces, add, tints, addLamp, makePiece, paintGeometry, stripedGeometry, M as composeM, goodSpot, houseClear };

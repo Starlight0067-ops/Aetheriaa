@@ -7,5 +7,6 @@ export const CATALOG = {
   toma:  { name: 'Toma',         role: 'Street messenger',          height: 1.38, colors: [0xe08a3c, 0x5a4636, 0x2f8f8a], accent: 0xffd36b },
   hesk:  { name: 'Hesk',         role: 'Blacksmith',                height: 1.84, colors: [0x5e4330, 0x3a3530, 0xb5654a], accent: 0xff8a3d },
   wenna: { name: 'Wenna',        role: 'Keeper of the Gilded Kettle', height: 1.63, colors: [0x8a3b3b, 0xf2ebdd, 0x4e8a5a], accent: 0xe8b65a },
+  veyra: { name: 'Veyra of the Hushed', role: 'Hushed envoy (antagonist)', height: 1.66, colors: [0x1c1a2a, 0x5a4a7a, 0xc0c4d8], accent: 0xb46bff },
 };
 export const CAST = Object.keys(CATALOG);

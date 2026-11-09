@@ -1,6 +1,15 @@
 {
-  "generated": "2026-11-08T03:43:49.783Z",
-  "vrm": {},
+  "generated": "2026-11-08T18:44:52.268Z",
+  "vrm": {
+    "hesk": "/assets/characters/hesk.vrm",
+    "kael": "/assets/characters/kael.vrm",
+    "lyra": "/assets/characters/lyra.vrm",
+    "maren": "/assets/characters/maren.vrm",
+    "ostin": "/assets/characters/ostin.vrm",
+    "toma": "/assets/characters/toma.vrm",
+    "veyra": "/assets/characters/veyra.vrm",
+    "wenna": "/assets/characters/wenna.vrm"
+  },
   "glb": {},
   "legacy": {
     "hesk": "/assets/characters/legacy/hesk.glb",

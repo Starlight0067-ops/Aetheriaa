@@ -64,7 +64,7 @@ const ringMat = createToonMaterial({ color: 0x7ff5ff, kind: 'glow', emissive: 0x
 const ctx = { THREE, renderer, scene, camera, quality, params, shot: isShot, assets: createAssets(renderer, quality), updaters: [], pending: [], systems: {}, time: 0 };
 window.__AETHERIA = ctx;
 
-const ORDER = ['toma', 'lyra', 'ostin', 'kael', 'hesk', 'maren', 'wenna'];
+const ORDER = ['toma', 'lyra', 'ostin', 'kael', 'hesk', 'maren', 'wenna', 'veyra'];
 const chars = [];
 const hud = document.getElementById('hud');
 

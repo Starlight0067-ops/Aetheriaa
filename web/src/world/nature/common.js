@@ -107,3 +107,15 @@ export function smoothPolyline(pts, steps = 6) {
   out.push(pts[pts.length - 1]);
   return out;
 }
+
+/** Aerial perspective for nature materials: rgb = haze colour (linear), w = full-haze distance. */
+export const HAZE = { uHaze: { value: new THREE.Vector4(0.42, 0.62, 0.86, 950) } };
+export const HAZE_PARS = 'uniform vec4 uHaze;';
+export const HAZE_FRAG = /* glsl */`
+{
+  float natHd = length(vViewPosition);
+  float natHz = pow(smoothstep(uHaze.w * 0.27, uHaze.w, natHd), 0.85) * 0.78;
+  outgoingLight = mix(outgoingLight, uHaze.rgb, natHz);
+}
+`;
+export function setHazeFromQuality(q) { HAZE.uHaze.value.w = Math.max(600, Math.min(1100, (q.drawDistance || 950) * 0.95)); }

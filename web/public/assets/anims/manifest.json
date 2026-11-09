@@ -1,221 +1,116 @@
 {
-  "generated": "2026-11-08T13:51:09.317Z",
+  "generated": "2026-11-08T18:44:52.281Z",
   "actions": {
     "attack1": {
       "src": "attack_1.fbx",
-      "json": "/assets/anims/attack1.json",
-      "sourceClip": "Sword_slash",
-      "sourceRig": "unreal",
-      "duration": 1.533,
-      "speedHipsPerSec": 0.522,
-      "travel": {
-        "x": 0.328,
-        "z": 0.729
-      }
+      "fbx": "/assets/anims/attack1.fbx",
+      "json": "/assets/anims/attack1.json"
     },
     "attack2": {
       "src": "attack_2.fbx",
-      "json": "/assets/anims/attack2.json",
-      "sourceClip": "Punch_jab_left_2",
-      "sourceRig": "unreal",
-      "duration": 0.8,
-      "speedHipsPerSec": 0,
-      "travel": {
-        "x": 0,
-        "z": 0
-      }
+      "fbx": "/assets/anims/attack2.fbx",
+      "json": "/assets/anims/attack2.json"
     },
     "attack3": {
       "src": "attack_3.fbx",
-      "json": "/assets/anims/attack3.json",
-      "sourceClip": "Punch_cross_right_2",
-      "sourceRig": "unreal",
-      "duration": 0.933,
-      "speedHipsPerSec": 0,
-      "travel": {
-        "x": 0,
-        "z": 0
-      }
+      "fbx": "/assets/anims/attack3.fbx",
+      "json": "/assets/anims/attack3.json"
     },
     "cast": {
       "src": "cast.fbx",
-      "json": "/assets/anims/cast.json",
-      "sourceClip": "HumanM@MagicAttackDirect2H01",
-      "sourceRig": "brig",
-      "duration": 1.6,
-      "speedHipsPerSec": 0,
-      "travel": {
-        "x": 0,
-        "z": 0
-      }
+      "fbx": "/assets/anims/cast.fbx",
+      "json": "/assets/anims/cast.json"
     },
     "death": {
       "src": "death.fbx",
-      "json": "/assets/anims/death.json",
-      "sourceClip": "Death_fall_backwards",
-      "sourceRig": "unreal",
-      "duration": 2.367,
-      "speedHipsPerSec": 0.222,
-      "travel": {
-        "x": -0.118,
-        "z": -0.512
-      }
+      "fbx": "/assets/anims/death.fbx",
+      "json": "/assets/anims/death.json"
     },
     "dodge": {
       "src": "dodge_roll.fbx",
-      "json": "/assets/anims/dodge.json",
-      "sourceClip": "Dodge_roll",
-      "sourceRig": "unreal",
-      "duration": 1.433,
-      "speedHipsPerSec": 2.879,
-      "travel": {
-        "x": 0.682,
-        "z": 4.07
-      }
+      "fbx": "/assets/anims/dodge.fbx",
+      "json": "/assets/anims/dodge.json"
     },
     "fall": {
       "src": "fall.fbx",
-      "json": "/assets/anims/fall.json",
-      "sourceClip": "Jump_in_the_air",
-      "sourceRig": "unreal",
-      "duration": 2.5,
-      "speedHipsPerSec": 0,
-      "travel": {
-        "x": 0,
-        "z": 0
-      }
+      "fbx": "/assets/anims/fall.fbx",
+      "json": "/assets/anims/fall.json"
     },
     "hit": {
       "src": "hit.fbx",
-      "json": "/assets/anims/hit.json",
-      "sourceClip": "Hit_to_the_chest",
-      "sourceRig": "unreal",
-      "duration": 0.333,
-      "speedHipsPerSec": 0.037,
-      "travel": {
-        "x": -0.003,
-        "z": -0.012
-      }
+      "fbx": "/assets/anims/hit.fbx",
+      "json": "/assets/anims/hit.json"
     },
     "idle": {
       "src": "idle.fbx",
-      "json": "/assets/anims/idle.json",
-      "sourceClip": "Idle_relaxed",
-      "sourceRig": "unreal",
-      "duration": 2.5,
-      "speedHipsPerSec": 0,
-      "travel": {
-        "x": 0,
-        "z": 0
-      }
+      "fbx": "/assets/anims/idle.fbx",
+      "json": "/assets/anims/idle.json"
     },
     "interact": {
       "src": "interact.fbx",
-      "json": "/assets/anims/interact.json",
-      "sourceClip": "Action_pick_up_from_a_table",
-      "sourceRig": "unreal",
-      "duration": 0.8,
-      "speedHipsPerSec": 0,
-      "travel": {
-        "x": 0,
-        "z": 0
-      }
+      "fbx": "/assets/anims/interact.fbx",
+      "json": "/assets/anims/interact.json"
     },
     "jump": {
       "src": "jump.fbx",
-      "json": "/assets/anims/jump.json",
-      "sourceClip": "Jump_take_off",
-      "sourceRig": "unreal",
-      "duration": 1.233,
-      "speedHipsPerSec": 0.022,
-      "travel": {
-        "x": -0.007,
-        "z": 0.026
-      }
+      "fbx": "/assets/anims/jump.fbx",
+      "json": "/assets/anims/jump.json"
     },
     "land": {
       "src": "land.fbx",
-      "json": "/assets/anims/land.json",
-      "sourceClip": "Jump_landing",
-      "sourceRig": "unreal",
-      "duration": 1.233,
-      "speedHipsPerSec": 0.011,
-      "travel": {
-        "x": 0.013,
-        "z": -0.001
-      }
+      "fbx": "/assets/anims/land.fbx",
+      "json": "/assets/anims/land.json"
     },
     "run": {
       "src": "run.fbx",
-      "json": "/assets/anims/run.json",
-      "sourceClip": "Run_jog_forwards",
-      "sourceRig": "unreal",
-      "duration": 0.867,
-      "speedHipsPerSec": 7.382,
-      "travel": {
-        "x": 0.061,
-        "z": 6.397
-      }
+      "fbx": "/assets/anims/run.fbx",
+      "json": "/assets/anims/run.json"
     },
     "sit": {
       "src": "sit_idle.fbx",
-      "json": "/assets/anims/sit.json",
-      "sourceClip": "Idle_sitting",
-      "sourceRig": "unreal",
-      "duration": 1.667,
-      "speedHipsPerSec": 0,
-      "travel": {
-        "x": 0,
-        "z": 0
-      }
+      "fbx": "/assets/anims/sit.fbx",
+      "json": "/assets/anims/sit.json"
     },
     "sprint": {
       "src": "sprint.fbx",
-      "json": "/assets/anims/sprint.json",
-      "sourceClip": "Run_sprint",
-      "sourceRig": "unreal",
-      "duration": 0.633,
-      "speedHipsPerSec": 10.443,
-      "travel": {
-        "x": 0.247,
-        "z": 6.609
-      }
+      "fbx": "/assets/anims/sprint.fbx",
+      "json": "/assets/anims/sprint.json"
     },
     "talk": {
       "src": "talk.fbx",
-      "json": "/assets/anims/talk.json",
-      "sourceClip": "Idle_talking",
-      "sourceRig": "unreal",
-      "duration": 2.933,
-      "speedHipsPerSec": 0,
-      "travel": {
-        "x": 0,
-        "z": 0
-      }
+      "fbx": "/assets/anims/talk.fbx",
+      "json": "/assets/anims/talk.json"
     },
     "walk": {
       "src": "walk.fbx",
-      "json": "/assets/anims/walk.json",
-      "sourceClip": "Walk_forwards",
-      "sourceRig": "unreal",
-      "duration": 1.3,
-      "speedHipsPerSec": 1.172,
-      "travel": {
-        "x": -0.053,
-        "z": 1.522
-      }
+      "fbx": "/assets/anims/walk.fbx",
+      "json": "/assets/anims/walk.json"
     },
     "wave": {
       "src": "wave.fbx",
-      "json": "/assets/anims/wave.json",
-      "sourceClip": "Action_interact",
-      "sourceRig": "unreal",
-      "duration": 2,
-      "speedHipsPerSec": 0,
-      "travel": {
-        "x": 0,
-        "z": 0
-      }
+      "fbx": "/assets/anims/wave.fbx",
+      "json": "/assets/anims/wave.json"
     }
-  }
+  },
+  "unmatched": [],
+  "wanted": [
+    "idle",
+    "walk",
+    "run",
+    "sprint",
+    "jump",
+    "fall",
+    "land",
+    "dodge_roll",
+    "attack_1",
+    "attack_2",
+    "attack_3",
+    "cast",
+    "hit",
+    "death",
+    "talk",
+    "wave",
+    "sit_idle",
+    "interact"
+  ]
 }

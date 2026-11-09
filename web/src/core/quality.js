@@ -1,6 +1,6 @@
 // Quality presets. Target: "max quality" on a dedicated GPU; `low` keeps Intel UHD laptops playable.
 export const PRESETS = {
-  low:    { name: 'low',    pixelRatio: 0.75, shadows: true, shadowMapSize: 1024, cascades: 2, shadowFar: 70,  bloom: false, smaa: false, ao: false, outlines: 'characters', grassDensity: 0.3, treeDensity: 0.55, drawDistance: 420,  waterQuality: 'simple', anisotropy: 2 },
+  low:    { name: 'low',    pixelRatio: 0.6,  shadows: true, shadowMapSize: 1024, cascades: 1, shadowFar: 45,  bloom: false, smaa: false, ao: false, outlines: 'characters', grassDensity: 0.15, treeDensity: 0.4, drawDistance: 340,  waterQuality: 'simple', anisotropy: 2 },
   medium: { name: 'medium', pixelRatio: 1.0,  shadows: true, shadowMapSize: 2048, cascades: 3, shadowFar: 130, bloom: true,  smaa: true,  ao: false, outlines: 'characters', grassDensity: 0.6, treeDensity: 0.8,  drawDistance: 650,  waterQuality: 'full',   anisotropy: 4 },
   high:   { name: 'high',   pixelRatio: 1.0,  shadows: true, shadowMapSize: 2048, cascades: 4, shadowFar: 220, bloom: true,  smaa: true,  ao: true,  outlines: 'all',        grassDensity: 1.0, treeDensity: 1.0,  drawDistance: 950,  waterQuality: 'full',   anisotropy: 8 },
   ultra:  { name: 'ultra',  pixelRatio: 1.5,  shadows: true, shadowMapSize: 4096, cascades: 4, shadowFar: 320, bloom: true,  smaa: true,  ao: true,  outlines: 'all',        grassDensity: 1.6, treeDensity: 1.3,  drawDistance: 1300, waterQuality: 'full',   anisotropy: 16 },
