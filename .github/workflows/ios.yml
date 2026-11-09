@@ -13,7 +13,9 @@ env:
 
 jobs:
   ios:
-    runs-on: macos-15
+    # Godot 4.7's iOS template (libgodot.a) is built with the iOS 26 SDK (Metal 4 symbols such as
+    # MTLTensorDomain), so it must be linked with Xcode 26 or newer.
+    runs-on: macos-26
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
@@ -22,6 +24,16 @@ jobs:
             /*
             !/web/
           sparse-checkout-cone-mode: false
+
+      - name: Select newest stable Xcode
+        run: |
+          ls -d /Applications/Xcode*.app
+          XC=$(ls -d /Applications/Xcode_*.app | grep -viE "beta|release_candidate|_rc" | sort -V | tail -1)
+          echo "Selecting $XC"
+          sudo xcode-select -s "$XC/Contents/Developer"
+          xcodebuild -version
+          MAJOR=$(xcodebuild -version | awk '/^Xcode/{split($2,v,"."); print v[1]}')
+          if [ "$MAJOR" -lt 26 ]; then echo "::error::Xcode 26+ is required for Godot 4.7 iOS templates (found $MAJOR)"; exit 1; fi
 
       - name: Cache Godot + export templates
         id: cache
