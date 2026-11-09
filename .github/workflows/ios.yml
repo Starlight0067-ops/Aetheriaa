@@ -58,20 +58,38 @@ jobs:
 
       - name: Build unsigned app
         run: |
+          set -eo pipefail
           cd build/ios
-          SCHEME=$(xcodebuild -list -project AETHERIA.xcodeproj | awk '/Schemes:/{getline; gsub(/^ +| +$/,""); print; exit}')
-          echo "scheme=$SCHEME"
+          ls -la
+          SCHEME=$(xcodebuild -list -json -project AETHERIA.xcodeproj | python3 -c "import json,sys; print(json.load(sys.stdin)['project']['schemes'][0])")
+          echo "Using scheme: $SCHEME"
           xcodebuild -project AETHERIA.xcodeproj -scheme "$SCHEME" -configuration Release \
-            -sdk iphoneos -destination 'generic/platform=iOS' -archivePath "$PWD/AETHERIA.xcarchive" archive \
-            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" DEVELOPMENT_TEAM="" | tail -40
+            -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath "$PWD/dd" build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" DEVELOPMENT_TEAM="" \
+            > xcodebuild.log 2>&1 || { echo "::error::xcodebuild failed"; grep -E "error:|fatal error" xcodebuild.log | head -40; tail -60 xcodebuild.log; exit 1; }
+          tail -5 xcodebuild.log
+          find dd/Build/Products -maxdepth 2 -name "*.app"
 
       - name: Package .ipa
         run: |
+          set -eo pipefail
           cd build/ios
+          APP=$(find dd/Build/Products -maxdepth 2 -name "*.app" | head -1)
+          echo "App bundle: $APP"
+          test -n "$APP"
           mkdir -p Payload
-          cp -R AETHERIA.xcarchive/Products/Applications/*.app Payload/
+          cp -R "$APP" Payload/
           zip -qry AETHERIA-unsigned.ipa Payload
           ls -la AETHERIA-unsigned.ipa
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-log
+          path: build/ios/xcodebuild.log
+          if-no-files-found: ignore
+          retention-days: 7
 
       - uses: actions/upload-artifact@v4
         with:
