@@ -19,3 +19,15 @@ static func gate(flag: String, size: Vector3) -> FlagGate:
 	g.flag = flag
 	g.size = size
 	return g
+
+
+static func element_seal(seal_id: String, group: String, element: String) -> ElementSeal:
+	var s := ElementSeal.new()
+	s.id = seal_id
+	s.puzzle_group = group
+	s.required_element = element
+	return s
+
+
+static func sanctum_seal() -> SanctumSeal:
+	return SanctumSeal.new()

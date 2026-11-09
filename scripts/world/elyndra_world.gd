@@ -38,6 +38,7 @@ func _ready() -> void:
 	StructureBuilder.build_town(arch)
 	StructureBuilder.build_ruins(arch)
 	StructureBuilder.build_arena(arch)
+	StructureBuilder.build_sanctum_interior(arch)
 	core = StructureBuilder.build_core(arch)
 	_build_atmosphere()
 	for c in [Vector2(-62, 36), Vector2(52, 40), Vector2(-52, -48)]:
@@ -48,6 +49,8 @@ func _ready() -> void:
 	_place_enemies()
 	_spawn_player()
 	add_child(HUD.new())
+	if TouchControls.is_wanted():
+		add_child(TouchControls.new())
 	add_child(DialogueUI.new())
 	add_child(GameMenu.new())
 	Settings.changed.connect(_apply_graphics)
@@ -228,6 +231,8 @@ func _place_points_of_interest() -> void:
 	for cp in [["cp_forest", "Whisperwood Stone", -52, 74], ["cp_plaza", "Plaza Stone", 17, 5],
 			["cp_lake", "Lakeside Stone", -30, -48], ["cp_ruins", "Choir Stone", 64, -11]]:
 		_add(Checkpoint.create(cp[0], cp[1]), _p(cp[2], cp[3]))
+	_add(Checkpoint.create("cp_sanctum", "Sanctum Antechamber Stone"),
+		Vector3(L.SANCTUM.x - 6.8, L.SANCTUM_FLOOR, -8.6))
 
 	# signs
 	for s in [["sign_harrow", -30, 4, "post", PI / 2.0], ["sign_forest", -52, 64, "post", 0.3], ["sign_east", 36, 3, "post", -PI / 2.0],
@@ -252,6 +257,8 @@ func _place_points_of_interest() -> void:
 	for c in chests:
 		var lift := 0.55 if c[0] == "chest_ruins_top" else 0.0
 		_add(Chest.create(c[0], c[3], 15 if c[4] == "" else 40, c[4]), _p(c[1], c[2], lift), randf() * 0.0)
+	_add(Chest.create("chest_sanctum_inner", {"healing_tonic": 2, "copper_coin": 80}, 40, "sanctum_inner_open"),
+		Vector3(L.SANCTUM.x + 6.4, L.SANCTUM_FLOOR, 13.4))
 
 	# gatherables
 	var i := 0
@@ -280,8 +287,28 @@ func _place_points_of_interest() -> void:
 	for b in [["brazier_a", 64, -24], ["brazier_b", 60, -30], ["brazier_c", 71, -33]]:
 		_add(PuzzleObjects.brazier(b[0], "ruins_braziers"), _p(b[1], b[2]))
 	_add(PuzzleObjects.gate("ruins_braziers_solved", Vector3(5.0, 4.0, 0.6)), _p(66, -29.4))
-	var gate_z := L.ARENA.y - 15.5 * cos(deg_to_rad(18.0))
-	_add(PuzzleObjects.gate("sanctum_open", Vector3(9.4, 5.0, 0.8)), Vector3(L.ARENA.x, 10.0, gate_z))
+
+	# Hollow Sanctum: outer gate, Ember and Gale choirs, inner seal and inner gate
+	_add(PuzzleObjects.gate("sanctum_open", Vector3(7.0, 4.6, 0.6)),
+		Vector3(L.SANCTUM.x, L.SANCTUM_FLOOR, L.SANCTUM_Z0))
+	_add(PuzzleObjects.gate("sanctum_inner_open", Vector3(7.0, 4.6, 0.6)),
+		Vector3(L.SANCTUM.x, L.SANCTUM_FLOOR, L.SANCTUM_Z1))
+	for b in [["sanctum_brazier_0", -6.6, -1.8], ["sanctum_brazier_1", 6.6, -1.8], ["sanctum_brazier_2", 0.0, -3.2]]:
+		_add(PuzzleObjects.brazier(b[0], "sanctum_braziers"),
+			Vector3(L.SANCTUM.x + b[1], L.SANCTUM_FLOOR, b[2]))
+	for s in [["sanctum_gale_0", -6.4, 6.6], ["sanctum_gale_1", 6.4, 6.6]]:
+		_add(PuzzleObjects.element_seal(s[0], "sanctum_gales", "zephyr"),
+			Vector3(L.SANCTUM.x + s[1], L.SANCTUM_FLOOR, s[2]))
+	_add(PuzzleObjects.sanctum_seal(), Vector3(L.SANCTUM.x, L.SANCTUM_FLOOR, 13.4))
+	for l in [[Vector3(-4.0, 5.2, -1.8), Color("#FFB36B"), 1.25], [Vector3(4.0, 5.2, 6.6), Color("#7FF5FF"), 1.05],
+			[Vector3(0.0, 4.6, 13.4), Color("#5FE3E0"), 1.15]]:
+		var light := OmniLight3D.new()
+		light.position = Vector3(L.SANCTUM.x + l[0].x, L.SANCTUM_FLOOR + l[0].y, l[0].z)
+		light.light_color = l[1]
+		light.light_energy = l[2]
+		light.omni_range = 11.0
+		light.shadow_enabled = false
+		add_child(light)
 
 
 func _place_npcs() -> void:
@@ -320,6 +347,9 @@ func _place_enemies() -> void:
 	]
 	for s in spawns:
 		_add(Enemy.create(s[0]), _p(s[1], s[2], 0.3))
+	# Hollow Sanctum guardians on the raised temple floor
+	for s in [["bramble_wisp", -3.4, -4.6], ["bramble_wisp", 3.4, -4.6], ["rootling_brute", 4.6, 10.8]]:
+		_add(Enemy.create(s[0]), Vector3(L.SANCTUM.x + s[1], L.SANCTUM_FLOOR + 0.3, s[2]))
 	boss = BossWarden.create_boss(Vector3(L.ARENA.x, 10.3, L.ARENA.y + 2.0))
 	_add(boss, Vector3(L.ARENA.x, 10.3, L.ARENA.y + 2.0), PI)
 
@@ -373,7 +403,7 @@ func _region_tick() -> void:
 	if player == null:
 		return
 	# boss trigger
-	if is_instance_valid(boss) and not boss.active and Game.has_flag("sanctum_open") and not Game.has_flag("warden_defeated"):
+	if is_instance_valid(boss) and not boss.active and Game.has_flag("sanctum_inner_open") and not Game.has_flag("warden_defeated"):
 		var d := Vector2(player.global_position.x - L.ARENA.x, player.global_position.z - L.ARENA.y).length()
 		if d < 11.0:
 			boss.awaken()

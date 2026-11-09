@@ -8,11 +8,23 @@ var anim: AnimationPlayer
 var talk := false
 var _lock_t := 0.0
 var _names: Dictionary = {}
+var vrm := false
+var _air_t := 0.0
 
 static var _mats: Dictionary = {}
+static var _library: AnimationLibrary
+
+## Free CC0 VRoid characters (assets/characters/vrm, retargeted to SkeletonProfileHumanoid at import).
+const TARGET_HEIGHT := {"kael": 1.75, "lyra": 1.62, "maren": 1.67, "wenna": 1.58, "toma": 1.48, "ostin": 1.68, "hesk": 1.86, "veyra": 1.72}
+const ACTIONS := ["idle", "walk", "run", "sprint", "jump", "fall", "land", "dodge", "attack1", "attack2", "attack3",
+	"hit", "death", "talk", "wave", "sit", "interact"]
+const LOOPS := ["idle", "walk", "run", "sprint", "fall", "talk", "sit"]
 
 
 static func load_character(id: String) -> CharacterModel:
+	var vrm := "res://assets/characters/vrm/%s.glb" % id
+	if ResourceLoader.exists(vrm):
+		return _load_vrm(id, vrm)
 	var path := "res://assets/models/characters/%s.glb" % id
 	if not ResourceLoader.exists(path):
 		return null
@@ -23,6 +35,68 @@ static func load_character(id: String) -> CharacterModel:
 	cm.add_child(inst)
 	cm._setup(inst)
 	return cm
+
+
+static func _load_vrm(id: String, path: String) -> CharacterModel:
+	var cm := CharacterModel.new()
+	cm.name = "Model"
+	var inst: Node3D = (load(path) as PackedScene).instantiate()
+	cm.add_child(inst)
+	var h := _measure_height(inst)
+	if h > 0.5:
+		inst.scale = Vector3.ONE * (float(TARGET_HEIGHT.get(id, 1.7)) / h)
+	var ap := AnimationPlayer.new()
+	ap.name = "HumanoidAnims"
+	inst.add_child(ap)
+	ap.root_node = NodePath("..")
+	ap.add_animation_library("", _humanoid_library())
+	cm.anim = ap
+	cm.vrm = true
+	for a in ap.get_animation_list():
+		cm._names[String(a)] = String(a)
+	# aliases used by the older gameplay API
+	cm._names["attack"] = "attack1"
+	cm._names["cast"] = "attack2"
+	cm._names["hurt"] = "hit"
+	cm._play("idle", 0.0)
+	return cm
+
+
+static func _measure_height(root: Node3D) -> float:
+	var top := 0.0
+	for mi in root.find_children("*", "MeshInstance3D", true, false):
+		var m := mi as MeshInstance3D
+		var aabb: AABB = m.get_aabb()
+		top = max(top, aabb.position.y + aabb.size.y)
+	return top
+
+
+## One shared AnimationLibrary built from the retargeted animation FBX files (tracks: %GeneralSkeleton:<bone>).
+static func _humanoid_library() -> AnimationLibrary:
+	if _library:
+		return _library
+	_library = AnimationLibrary.new()
+	var profile := SkeletonProfileHumanoid.new()
+	for a in ACTIONS:
+		var path := "res://assets/animations/%s.fbx" % a
+		if not ResourceLoader.exists(path):
+			continue
+		var scene: Node = (load(path) as PackedScene).instantiate()
+		var players := scene.find_children("*", "AnimationPlayer", true, false)
+		if players.size() > 0:
+			var p := players[0] as AnimationPlayer
+			var names := p.get_animation_list()
+			if names.size() > 0:
+				var anim := p.get_animation(names[0]).duplicate() as Animation
+				# keep only humanoid-profile bone tracks (drop leaf/helper bones the characters don't have)
+				for t in range(anim.get_track_count() - 1, -1, -1):
+					var sub := String(anim.track_get_path(t).get_concatenated_subnames())
+					if sub != "" and profile.find_bone(sub) < 0:
+						anim.remove_track(t)
+				anim.loop_mode = Animation.LOOP_LINEAR if a in LOOPS else Animation.LOOP_NONE
+				_library.add_animation(a, anim)
+		scene.free()
+	return _library
 
 
 func _setup(inst: Node3D) -> void:
@@ -60,8 +134,15 @@ func animate(delta: float, speed_ratio: float, airborne: bool = false) -> void:
 		_lock_t -= delta
 		return
 	if airborne:
-		_play("jump", 0.12)
-	elif speed_ratio > 0.62:
+		_air_t += delta
+		_play("fall" if (vrm and _air_t > 0.45) else "jump", 0.15)
+		return
+	if _air_t > 0.3 and vrm:
+		_air_t = 0.0
+		_one_shot("land", 0.25, 1.6)
+		return
+	_air_t = 0.0
+	if speed_ratio > 0.62:
 		_play("run", 0.18, clamp(speed_ratio * 1.25, 0.9, 1.4))
 	elif speed_ratio > 0.05:
 		_play("walk", 0.2, clamp(speed_ratio * 2.2, 0.7, 1.4))
@@ -72,7 +153,13 @@ func animate(delta: float, speed_ratio: float, airborne: bool = false) -> void:
 
 
 func play_attack(combo_index: int) -> void:
+	if vrm:
+		_one_shot(["attack1", "attack2", "attack3"][combo_index % 3], 0.42, 1.7)
+		return
 	_one_shot("attack", 0.34, 1.5 + combo_index * 0.15)
+
+func play_dodge() -> void:
+	_one_shot("dodge", 0.32, 1.9)
 
 func play_cast() -> void:
 	_one_shot("cast", 0.45, 1.3)

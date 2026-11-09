@@ -29,6 +29,18 @@ static func _collider(parent: Node3D, pos: Vector3, size: Vector3, rot_y: float 
 	parent.add_child(body)
 
 
+static func _collider_x(parent: Node3D, pos: Vector3, size: Vector3, rot_x: float) -> void:
+	var body := StaticBody3D.new()
+	var cs := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = size
+	cs.shape = shape
+	cs.position = pos
+	cs.rotation.x = rot_x
+	body.add_child(cs)
+	parent.add_child(body)
+
+
 ## Generic house. opts: w, d, floors, roof ("gable","hip","flat_tower"), wall, roof_col,
 ## chimney, awning (color), timber, balcony, sign (color)
 static func building(parent: Node3D, name: String, pos2: Vector2, rot_y: float, o: Dictionary) -> Node3D:
@@ -355,6 +367,154 @@ static func build_arena(parent: Node3D) -> void:
 		_collider(parent, mid + Vector3(0, 2.5, 0), Vector3(0.8, 5.0, length), ang)
 	k.instance(parent, "SanctumArena")
 	_collider(parent, Vector3(c.x, y - 0.1, c.y), Vector3(28.0, 0.4, 28.0))
+
+
+## Roofed Choir temple on the climb to the Hollow Warden's arena. The outer
+## gate (sanctum_open) leads into the nave; two elemental choirs feed the inner
+## seal (sanctum_inner_open) that opens the way to the arena.
+static func build_sanctum_interior(parent: Node3D) -> Node3D:
+	var c := L.SANCTUM
+	var fy := L.SANCTUM_FLOOR
+	var z0 := L.SANCTUM_Z0
+	var z1 := L.SANCTUM_Z1
+	var depth := z1 - z0
+	var cz := (z0 + z1) * 0.5
+	var root := Node3D.new()
+	root.name = "HollowSanctum"
+	parent.add_child(root)
+	var k := MeshKit.new()
+	k.glow_color = Color("#5FE3E0")
+	var wall := Color("#8C97A6")
+	var wall_dark := Color("#6E7A8C")
+	var floor_col := Color("#7E8794")
+	var trim := Color("#C9BFA8")
+	var cyan := Color("#5FE3E0")
+
+	# foundation, floor slab and aisle inlays
+	k.box(Vector3(c.x, fy - 2.2, cz), Vector3(19.8, 5.0, depth - 1.0), wall_dark)
+	k.box(Vector3(c.x, fy - 0.45, cz), Vector3(21.2, 0.9, depth), floor_col)
+	k.box(Vector3(c.x, fy + 0.015, cz), Vector3(5.4, 0.03, depth - 1.0), wall_dark)
+	for i in 9:
+		var zz := z0 + 2.0 + i * 2.8
+		k.box(Vector3(c.x - 2.9, fy + 0.035, zz), Vector3(0.12, 0.03, 1.8), cyan, 0.0, true)
+		k.box(Vector3(c.x + 2.9, fy + 0.035, zz), Vector3(0.12, 0.03, 1.8), cyan, 0.0, true)
+	_collider(parent, Vector3(c.x, fy - 0.45, cz), Vector3(21.2, 0.9, depth))
+	# threshold platforms under both gates, flush with the ramps
+	for tz in [z0, z1]:
+		k.box(Vector3(c.x, fy - 1.5, tz), Vector3(7.2, 3.0, 1.0), floor_col)
+		_collider(parent, Vector3(c.x, fy - 1.5, tz), Vector3(7.2, 3.0, 1.0))
+
+	# side walls, plinth and cornice
+	for sx in [-1.0, 1.0]:
+		k.box(Vector3(c.x + sx * 10.0, fy + 4.5, cz), Vector3(0.9, 9.0, depth), wall)
+		k.box(Vector3(c.x + sx * 10.0, fy + 0.55, cz), Vector3(1.1, 1.1, depth), trim)
+		k.box(Vector3(c.x + sx * 10.0, fy + 8.72, cz), Vector3(1.15, 0.56, depth), trim)
+		_collider(parent, Vector3(c.x + sx * 10.0, fy + 4.5, cz), Vector3(0.9, 9.0, depth))
+
+	# south and north walls with their gates
+	for sz in [z0, z1]:
+		for sx in [-1.0, 1.0]:
+			k.box(Vector3(c.x + sx * 6.75, fy + 4.5, sz), Vector3(6.5, 9.0, 0.9), wall)
+			_collider(parent, Vector3(c.x + sx * 6.75, fy + 4.5, sz), Vector3(6.5, 9.0, 0.9))
+		k.box(Vector3(c.x, fy + 6.75, sz), Vector3(7.0, 4.5, 0.9), wall)
+		k.box(Vector3(c.x - 3.85, fy + 2.5, sz), Vector3(0.7, 5.0, 1.2), trim)
+		k.box(Vector3(c.x + 3.85, fy + 2.5, sz), Vector3(0.7, 5.0, 1.2), trim)
+		k.box(Vector3(c.x, fy + 5.15, sz), Vector3(8.4, 0.7, 1.2), trim)
+		k.box(Vector3(c.x, fy + 4.74, sz), Vector3(7.0, 0.12, 1.24), cyan, 0.0, true)
+		k.sphere(Vector3(c.x, fy + 7.35, sz), Vector3(1.6, 1.6, 0.24), trim, 12)
+		k.sphere(Vector3(c.x, fy + 7.35, sz), Vector3(1.15, 1.15, 0.3), cyan, 12, true)
+
+	# transverse arches dividing the Ember hall, the Gale hall and the inner sanctum
+	for pz in [2.0, 9.0]:
+		for sx in [-1.0, 1.0]:
+			k.box(Vector3(c.x + sx * 6.75, fy + 4.5, pz), Vector3(6.5, 9.0, 0.7), wall_dark)
+			_collider(parent, Vector3(c.x + sx * 6.75, fy + 4.5, pz), Vector3(6.5, 9.0, 0.7))
+		k.box(Vector3(c.x, fy + 6.75, pz), Vector3(7.0, 4.5, 0.7), wall_dark)
+		k.box(Vector3(c.x, fy + 4.74, pz), Vector3(7.0, 0.12, 0.9), cyan, 0.0, true)
+		k.box(Vector3(c.x, fy + 8.3, pz), Vector3(7.2, 0.7, 0.9), trim)
+
+	# engaged pilasters and wall glow slits
+	for pz in [-7.5, -1.5, 5.5, 12.5]:
+		for sx in [-1.0, 1.0]:
+			k.box(Vector3(c.x + sx * 9.25, fy + 4.5, pz), Vector3(0.8, 9.0, 0.8), trim)
+	for gz in [-4.6, 3.0, 11.0]:
+		for sx in [-1.0, 1.0]:
+			k.box(Vector3(c.x + sx * 9.46, fy + 4.2, gz), Vector3(0.08, 5.6, 0.16), cyan, 0.0, true)
+
+	# exterior buttresses
+	for bz in [-6.0, 2.0, 10.0]:
+		for sx in [-1.0, 1.0]:
+			k.box(Vector3(c.x + sx * 10.85, fy + 3.3, bz), Vector3(0.9, 6.6, 1.2), wall)
+			k.box(Vector3(c.x + sx * 10.85, fy + 6.8, bz), Vector3(1.05, 0.4, 1.35), trim)
+			_collider(parent, Vector3(c.x + sx * 10.85, fy + 3.3, bz), Vector3(0.9, 6.6, 1.2))
+
+	# rear porch walls close the gap between the temple and the arena ring
+	for sx in [-1.0, 1.0]:
+		k.box(Vector3(c.x + sx * 10.0, fy + 2.6, z1 + 2.1), Vector3(0.9, 5.2, 4.4), wall)
+		k.box(Vector3(c.x + sx * 10.0, fy + 5.25, z1 + 2.1), Vector3(1.1, 0.35, 4.5), trim)
+		_collider(parent, Vector3(c.x + sx * 10.0, fy + 2.6, z1 + 2.1), Vector3(0.9, 5.2, 4.4))
+
+	# ramps: up from the approach, down into the arena
+	var ang := atan2(2.0, 4.0)
+	var ramp_len := sqrt(20.0)
+	var ramp_cy := fy - 1.18
+	var ramp := BoxMesh.new()
+	ramp.size = Vector3(6.0, 0.4, ramp_len)
+	k.add(ramp, Transform3D(Basis(Vector3.RIGHT, -ang), Vector3(c.x, ramp_cy, z0 - 2.5)), floor_col)
+	_collider_x(parent, Vector3(c.x, ramp_cy, z0 - 2.5), Vector3(6.0, 0.4, ramp_len), -ang)
+	k.add(ramp, Transform3D(Basis(Vector3.RIGHT, ang), Vector3(c.x, ramp_cy, z1 + 2.5)), floor_col)
+	_collider_x(parent, Vector3(c.x, ramp_cy, z1 + 2.5), Vector3(6.0, 0.4, ramp_len), ang)
+	for rz in [z0 - 2.5, z1 + 2.5]:
+		var rx := -ang if rz < cz else ang
+		for sx in [-1.0, 1.0]:
+			var curb := BoxMesh.new()
+			curb.size = Vector3(0.45, 0.55, ramp_len)
+			k.add(curb, Transform3D(Basis(Vector3.RIGHT, rx), Vector3(c.x + sx * 3.25, ramp_cy + 0.28, rz)), trim)
+			_collider_x(parent, Vector3(c.x + sx * 3.25, ramp_cy + 0.28, rz), Vector3(0.45, 0.55, ramp_len), rx)
+		var strip := BoxMesh.new()
+		strip.size = Vector3(0.14, 0.42, ramp_len)
+		k.add(strip, Transform3D(Basis(Vector3.RIGHT, rx), Vector3(c.x, ramp_cy + 0.2, rz)), cyan, true)
+
+	# pitched roof, ridge cap, gable ends and interior beams
+	var half := 10.75
+	var rise := 5.2
+	var roof_ang := atan2(rise, half)
+	var roof_len := sqrt(half * half + rise * rise)
+	var plane := BoxMesh.new()
+	plane.size = Vector3(roof_len, 0.35, depth + 2.4)
+	for sx in [-1.0, 1.0]:
+		var b := Basis(Vector3.BACK, -sx * roof_ang)
+		k.add(plane, Transform3D(b, Vector3(c.x + sx * half * 0.5, fy + 9.0 + rise * 0.5, cz)), wall_dark)
+	k.box(Vector3(c.x, fy + 9.0 + rise + 0.1, cz), Vector3(0.7, 0.4, depth + 2.4), trim)
+	for sz in [z0 - 0.3, z1 + 0.3]:
+		var pm := PrismMesh.new()
+		pm.size = Vector3(21.4, rise, 0.6)
+		k.add(pm, Transform3D(Basis(), Vector3(c.x, fy + 9.0 + rise * 0.5, sz)), wall)
+	for i in 7:
+		k.box(Vector3(c.x, fy + 8.35, z0 + 1.5 + i * 4.0), Vector3(19.2, 0.45, 0.55), Color("#6B4630"))
+
+	# hanging Choir lanterns under the beams
+	for lz in [-6.0, 2.0, 10.0, 14.0]:
+		for sx in [-1.0, 1.0]:
+			k.cyl(Vector3(c.x + sx * 6.0, fy + 7.9, lz), 0.05, 0.05, 1.4, trim, 4)
+			k.sphere(Vector3(c.x + sx * 6.0, fy + 7.1, lz), Vector3(0.5, 0.6, 0.5), Color("#BDF7FF"), 6, true)
+
+	# glowing Choir emblems on the floor, one per hall
+	for i in 8:
+		var a := i * TAU / 8.0
+		k.box(Vector3(c.x + cos(a) * 4.4, fy + 0.05, -1.8 + sin(a) * 4.4), Vector3(0.5, 0.05, 0.14), Color("#FF8A3D"), -a, true)
+	for i in 8:
+		var a2 := i * TAU / 8.0
+		k.box(Vector3(c.x + cos(a2) * 3.6, fy + 0.05, 6.6 + sin(a2) * 3.6), Vector3(0.45, 0.05, 0.12), Color("#7FF5FF"), -a2, true)
+	for i in 12:
+		var a3 := i * TAU / 12.0
+		k.box(Vector3(c.x + cos(a3) * 4.6, fy + 0.05, 13.4 + sin(a3) * 4.6), Vector3(0.5, 0.05, 0.12), cyan, -a3, true)
+
+	# facade emblem
+	k.cyl(Vector3(c.x, fy + 11.6, z0 - 0.62), 0.0, 0.9, 2.2, cyan, 4, Basis(), true)
+	k.cyl(Vector3(c.x, fy + 10.6, z0 - 0.62), 0.9, 0.0, 1.4, cyan, 4, Basis(), true)
+	k.instance(root, "SanctumInterior")
+	return root
 
 
 static func build_core(parent: Node3D) -> Node3D:

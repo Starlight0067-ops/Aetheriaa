@@ -1,0 +1,80 @@
+# Builds the AETHERIA iOS app in the cloud (GitHub-hosted Mac) and uploads an UNSIGNED .ipa.
+# Sign + install it on your iPhone from Windows with Sideloadly and your Apple ID (see documentation/IOS_BUILD.md).
+name: iOS build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+    paths-ignore: ["web/**", "documentation/**", "blender/**", "*.md"]
+
+env:
+  GODOT_VERSION: "4.7.2"
+
+jobs:
+  ios:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            /*
+            !/web/
+          sparse-checkout-cone-mode: false
+
+      - name: Cache Godot + export templates
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/godot
+            ~/Library/Application Support/Godot/export_templates
+          key: godot-${{ env.GODOT_VERSION }}-macos-ios
+
+      - name: Install Godot and iOS export template
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/godot && cd ~/godot
+          curl -fsSL -o godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_macos.universal.zip"
+          unzip -q godot.zip && rm godot.zip
+          curl -fsSL -o templates.tpz "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          T="$HOME/Library/Application Support/Godot/export_templates/${GODOT_VERSION}.stable"
+          mkdir -p "$T"
+          unzip -q -j templates.tpz "templates/ios.zip" "templates/version.txt" -d "$T"
+          rm templates.tpz
+
+      - name: Import assets (VRM retarget + post-import run here)
+        run: |
+          GODOT="$HOME/godot/Godot.app/Contents/MacOS/Godot"
+          "$GODOT" --headless --path . --import || true
+
+      - name: Export Xcode project
+        run: |
+          GODOT="$HOME/godot/Godot.app/Contents/MacOS/Godot"
+          mkdir -p build/ios
+          "$GODOT" --headless --path . --export-release "iOS" build/ios/AETHERIA.ipa
+          ls -la build/ios
+
+      - name: Build unsigned app
+        run: |
+          cd build/ios
+          SCHEME=$(xcodebuild -list -project AETHERIA.xcodeproj | awk '/Schemes:/{getline; gsub(/^ +| +$/,""); print; exit}')
+          echo "scheme=$SCHEME"
+          xcodebuild -project AETHERIA.xcodeproj -scheme "$SCHEME" -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' -archivePath "$PWD/AETHERIA.xcarchive" archive \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" DEVELOPMENT_TEAM="" | tail -40
+
+      - name: Package .ipa
+        run: |
+          cd build/ios
+          mkdir -p Payload
+          cp -R AETHERIA.xcarchive/Products/Applications/*.app Payload/
+          zip -qry AETHERIA-unsigned.ipa Payload
+          ls -la AETHERIA-unsigned.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AETHERIA-iOS-unsigned
+          path: build/ios/AETHERIA-unsigned.ipa
+          retention-days: 14

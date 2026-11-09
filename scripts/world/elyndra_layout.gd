@@ -18,6 +18,12 @@ const ARENA := Vector2(80, 32)
 const CORE := Vector2(90, -48)
 const OVERLOOK := Vector2(-82, -22)
 
+## Hollow Sanctum interior: a roofed Choir temple on the path to the arena.
+const SANCTUM := Vector2(80, 3)
+const SANCTUM_FLOOR := 12.0
+const SANCTUM_Z0 := -10.5
+const SANCTUM_Z1 := 16.5
+
 ## Named roads (polylines). Used for terrain tint and to keep props off paths.
 const ROADS := {
 	"forest_road": [Vector2(-58, 84), Vector2(-50, 62), Vector2(-38, 44), Vector2(-28, 26), Vector2(-22, 10), Vector2(-16, 0)],

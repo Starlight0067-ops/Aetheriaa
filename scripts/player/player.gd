@@ -184,8 +184,8 @@ func _physics_process(delta: float) -> void:
 	_was_airborne = airborne
 	var spd := Vector2(velocity.x, velocity.z).length()
 	model.animate(delta, clamp(spd / SPRINT_SPEED, 0.0, 1.0), airborne and abs(velocity.y) > 2.0)
-	if _dodge_t > 0.0:
-		model.rotation.x = -TAU * (1.0 - _dodge_t / DODGE_TIME)
+	if _dodge_t > 0.0 and not model.has_method("play_dodge"):
+		model.rotation.x = -TAU * (1.0 - _dodge_t / DODGE_TIME)   # procedural roll for the legacy model
 	else:
 		model.rotation.x = 0.0
 	if is_on_floor() and spd > 1.0:
@@ -244,6 +244,8 @@ func _try_dodge() -> void:
 	_dodge_t = DODGE_TIME
 	_invuln = DODGE_TIME + 0.08
 	_attack_t = 0.0
+	if model.has_method("play_dodge"):
+		model.play_dodge()
 	Sfx.play("dodge")
 
 

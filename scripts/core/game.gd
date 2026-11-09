@@ -172,6 +172,10 @@ func clear_ui() -> void:
 
 func _update_mouse() -> void:
 	var open := is_ui_open()
+	if TouchControls.is_wanted():
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+		ui_focus_changed.emit(open)
+		return
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if open else Input.MOUSE_MODE_CAPTURED
 	ui_focus_changed.emit(open)
 

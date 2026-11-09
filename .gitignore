@@ -2,3 +2,4 @@
 builds/
 backups/*.zip
 *.blend1
+build/

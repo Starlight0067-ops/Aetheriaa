@@ -72,6 +72,8 @@ func _setup_buses() -> void:
 
 
 func load_settings() -> void:
+	if OS.has_feature("mobile"):
+		data.graphics = "medium"   # modern phones (e.g. iPhone 16) handle medium well
 	var cfg := ConfigFile.new()
 	if cfg.load(PATH) != OK:
 		return
@@ -94,8 +96,10 @@ func _setup_input() -> void:
 	_key("move_right", [KEY_D, KEY_RIGHT])
 	_key("sprint", [KEY_SHIFT])
 	_key("jump", [KEY_SPACE])
-	_key("dodge", [KEY_CTRL, KEY_ALT], [MOUSE_BUTTON_RIGHT])
-	_key("attack", [], [MOUSE_BUTTON_LEFT])
+	# on touch screens taps would arrive as emulated mouse clicks: keep attack/dodge on the on-screen buttons
+	var touch := TouchControls.is_wanted()
+	_key("dodge", [KEY_CTRL, KEY_ALT], [] if touch else [MOUSE_BUTTON_RIGHT])
+	_key("attack", [], [] if touch else [MOUSE_BUTTON_LEFT])
 	_key("skill", [KEY_E])
 	_key("interact", [KEY_F])
 	_key("lock_on", [KEY_TAB], [MOUSE_BUTTON_MIDDLE])

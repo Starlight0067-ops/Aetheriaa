@@ -236,6 +236,9 @@ func _process(delta: float) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if not _active or Engine.get_process_frames() == _opened_frame:
 		return
+	if event is InputEventScreenTouch and event.pressed:
+		_advance()   # tap anywhere to continue (choice buttons still get their own tap)
+		return
 	if event.is_action_pressed("interact") or event.is_action_pressed("jump") or event.is_action_pressed("attack"):
 		get_viewport().set_input_as_handled()
 		_advance()

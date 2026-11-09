@@ -25,6 +25,8 @@ SaveManager="*res://scripts/save/save_manager.gd"
 
 [display]
 
+window/handheld/orientation=4
+
 window/size/viewport_width=1280
 window/size/viewport_height=720
 window/stretch/mode="canvas_items"

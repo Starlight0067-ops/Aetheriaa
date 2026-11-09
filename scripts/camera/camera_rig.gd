@@ -57,6 +57,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		distance = min(max_distance, distance + 0.6)
 
 
+## Touch camera drag (pixels of finger movement).
+func add_look(d: Vector2) -> void:
+	var s: float = Settings.data.sensitivity * 0.009
+	yaw -= d.x * s
+	var inv := -1.0 if Settings.data.invert_y else 1.0
+	pitch = clamp(pitch - d.y * s * inv, -1.25, 0.6)
+
+
 func shake(amount: float) -> void:
 	_shake = max(_shake, amount)
 

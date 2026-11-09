@@ -120,6 +120,9 @@ func _ready() -> void:
 	hint.offset_bottom = -8
 	hint.autowrap_mode = TextServer.AUTOWRAP_OFF
 	root.add_child(hint)
+	if TouchControls.is_wanted():
+		eb.visible = false     # elements are switched with the on-screen ◆ button
+		hint.visible = false
 
 	# --- interaction prompt (bottom-center) ---
 	_prompt = PanelContainer.new()
@@ -215,7 +218,7 @@ func _process(_d: float) -> void:
 		cd.value = total - player.cooldowns.get(el, 0.0)
 	if player.interact_target and not Game.is_ui_open():
 		_prompt.visible = true
-		_prompt_label.text = "[F]  " + player.interact_target.get_prompt()
+		_prompt_label.text = ("" if TouchControls.is_wanted() else "[F]  ") + player.interact_target.get_prompt()
 	else:
 		_prompt.visible = false
 	var lt := player.lock_target
