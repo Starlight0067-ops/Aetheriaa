@@ -113,9 +113,10 @@ func _draw() -> void:
 		var yaw: float = cam.yaw if cam else player.rotation.y
 		var fwd := Vector2(-sin(yaw), -cos(yaw))
 		var right := Vector2(-fwd.y, fwd.x)
-		var pts := PackedVector2Array([pp + fwd * 9.0, pp - fwd * 5.0 + right * 6.0, pp - fwd * 2.0, pp - fwd * 5.0 - right * 6.0])
-		draw_colored_polygon(pts, Color.WHITE)
-		draw_polyline(pts + PackedVector2Array([pts[0]]), Color("#1B2A4A"), 1.5)
+		var wedge := PackedVector2Array([pp + fwd * 13.0, pp + fwd * 4.0 + right * 5.0, pp + fwd * 4.0 - right * 5.0])
+		draw_colored_polygon(wedge, Color(1.0, 0.83, 0.3, 0.9))
+		draw_circle(pp, 7.0, Color("#1B2A4A"))
+		draw_circle(pp, 5.0, Color("#FFD34D"))
 	if minimap:
 		draw_rect(Rect2(Vector2.ZERO, size), UITheme.BRASS, false, 2.0)
 

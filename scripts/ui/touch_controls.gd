@@ -53,11 +53,10 @@ func _ready() -> void:
 	_knob.visible = false
 	add_child(_knob)
 	_add_button("attack", "ATK", 76, Vector2(-128, -128), Color("#E2B95B"))
-	_add_button("skill", "E", 52, Vector2(-268, -92), Color("#7FF5FF"))
+	_add_button("skill", "SKILL", 52, Vector2(-268, -92), Color("#7FF5FF"))
 	_add_button("dodge", "»", 50, Vector2(-108, -284), Color("#A9B4C8"))
 	_add_button("jump", "▲", 50, Vector2(-250, -232), Color("#A9B4C8"))
 	_add_button("heal", "+", 36, Vector2(-392, -64), Color("#FF7A8A"))
-	_add_button("lock_on", "◎", 34, Vector2(-372, -176), Color("#FF6A5A"))
 	_interact = _add_button("interact", "USE", 46, Vector2(-128, -420), Color("#9FE3A8"))
 	_add_button("pause", "≡", 32, Vector2(0, 0), Color("#F4EEDC"), true)
 	_add_cycle_button()
@@ -112,7 +111,7 @@ func _add_button(action: String, text: String, radius: int, offset: Vector2, tin
 
 ## Cycles to the next unlocked element (keyboard uses 1-6).
 func _add_cycle_button() -> void:
-	var b := _add_button("", "◆", 32, Vector2(-372, -290), Color("#B46BFF"))
+	var b := _add_button("", "◆", 32, Vector2(-392, -190), Color("#B46BFF"))
 	b.pressed.connect(func():
 		var list: Array = Game.unlocked_elements
 		if list.size() > 1:
@@ -204,7 +203,18 @@ func _set_action(action: String, strength: float) -> void:
 
 func _process(_d: float) -> void:
 	var player := get_tree().get_first_node_in_group("player")
-	_interact.visible = player != null and player.get("interact_target") != null and not Game.is_ui_open()
+	var ui := Game.is_ui_open()
+	# dialogue / menus own the screen: hide gameplay buttons so taps can't fight the UI
+	for b in _buttons:
+		if b != _interact:
+			b.visible = not ui
+	_interact.visible = not ui and player != null and player.get("interact_target") != null
+	if ui and _stick_index >= 0:
+		_stick_index = -1
+		_stick = Vector2.ZERO
+		_base.visible = false
+		_knob.visible = false
+		_apply_stick()
 	if _skill_ring:
 		_skill_ring.modulate = DB.element_color(Game.current_element)
 	visible = not get_tree().paused

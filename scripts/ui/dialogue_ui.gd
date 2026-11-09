@@ -19,6 +19,9 @@ var _typing := 0.0
 var _active := false
 var history: Array = []
 var _opened_frame := -1
+var _last_advance_ms := 0
+var _next_btn: Button
+var _skip_btn: Button
 
 
 func _ready() -> void:
@@ -60,6 +63,10 @@ func _ready() -> void:
 	_name = UITheme.title("", 26)
 	_title = UITheme.label("", 15, UITheme.MUTED)
 	_title.size_flags_vertical = Control.SIZE_SHRINK_END
+	# no autowrap inside an HBox: the container would give it zero width and the text would stack letter by letter
+	_title.autowrap_mode = TextServer.AUTOWRAP_OFF
+	_title.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	nb.add_child(_name)
 	nb.add_child(_title)
 	_text = RichTextLabel.new()
@@ -73,7 +80,22 @@ func _ready() -> void:
 	vb.add_child(_choices)
 	_hint = UITheme.label("[F / Space / Click] Continue", 13, UITheme.MUTED)
 	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_hint.autowrap_mode = TextServer.AUTOWRAP_OFF
 	vb.add_child(_hint)
+	# explicit, touch-friendly controls so a conversation can always be advanced or skipped
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_END
+	row.add_theme_constant_override("separation", 12)
+	vb.add_child(row)
+	_skip_btn = UITheme.button("Skip  »", _skip, 150)
+	_next_btn = UITheme.button("Next  ▶", _advance_from_input, 190)
+	_skip_btn.custom_minimum_size.y = 56
+	_next_btn.custom_minimum_size.y = 56
+	row.add_child(_skip_btn)
+	row.add_child(_next_btn)
+	box.gui_input.connect(_on_box_input)
+	if TouchControls.is_wanted():
+		_hint.visible = false
 	_root.visible = false
 
 
@@ -161,7 +183,9 @@ func _show(node: Dictionary) -> void:
 		_run_action(a)
 	for c in _choices.get_children():
 		c.queue_free()
-	_hint.visible = not node.has("choices")
+	_hint.visible = not node.has("choices") and not TouchControls.is_wanted()
+	if _next_btn:
+		_next_btn.visible = not node.has("choices")
 
 
 func _show_choices() -> void:
@@ -189,6 +213,42 @@ func _goto(next_id: String) -> void:
 		_close()
 	else:
 		_show(_nodes[next_id])
+
+
+func _on_box_input(event: InputEvent) -> void:
+	var tap: bool = (event is InputEventScreenTouch and event.pressed) or \
+		(event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT)
+	if tap:
+		_advance_from_input()
+
+
+## Fast-forwards the conversation (first valid choice at each branch) so quest actions still run.
+func _skip() -> void:
+	var guard := 0
+	while _active and guard < 64:
+		guard += 1
+		if _node.has("choices"):
+			var valid := []
+			for ch in _node.choices:
+				if Game.check_condition(ch.get("condition", {})):
+					valid.append(ch)
+			if valid.is_empty():
+				_close()
+			else:
+				_pick(valid[0])
+		elif _node.get("end", false):
+			_close()
+		else:
+			_goto(_node.get("next", ""))
+
+
+## Input-driven advance: one tap can arrive as both a touch and an emulated click, so drop duplicates.
+func _advance_from_input() -> void:
+	var now := Time.get_ticks_msec()
+	if now - _last_advance_ms < 150:
+		return
+	_last_advance_ms = now
+	_advance()
 
 
 func _advance() -> void:
@@ -237,7 +297,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not _active or Engine.get_process_frames() == _opened_frame:
 		return
 	if event is InputEventScreenTouch and event.pressed:
-		_advance()   # tap anywhere to continue (choice buttons still get their own tap)
+		_advance_from_input()   # tap anywhere to continue (choice buttons still get their own tap)
 		return
 	if event.is_action_pressed("interact") or event.is_action_pressed("jump") or event.is_action_pressed("attack"):
 		get_viewport().set_input_as_handled()
