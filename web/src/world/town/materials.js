@@ -92,7 +92,14 @@ export async function createMaterials(ctx) {
     } catch (e) { return null; }
   };
   const names = ['roof_tiles.jpg', 'plaster.jpg', 'timber.jpg', 'stone_wall.jpg', 'wood_planks.jpg', 'cobblestone.jpg', 'ivy.png', 'flowers.png'];
-  const [roofT, plasterT, timberT, stoneT, planksT, cobbleT, ivyT, flowersT] = await Promise.all(names.map(load));
+  let [roofT, plasterT, timberT, stoneT, planksT, cobbleT, ivyT, flowersT] = await Promise.all(names.map(load));
+  // third-party CC0 Poly Haven cobblestone (albedo + normal) for streets and plaza; ?ground=old keeps the painted one
+  let cobbleN = null;
+  if (ctx.params?.get('ground') !== 'old') {
+    const CC0 = '/assets/cc0/ground/cobblestone_floor_08_';
+    const [d, n] = await Promise.all([A.tryTexture(CC0 + 'diff_1k.jpg'), A.tryTexture(CC0 + 'nor_gl_1k.jpg', { srgb: false })]);
+    if (d) { cobbleT = d; cobbleN = n || null; }
+  }
 
   const prep = (t, { wrapS = THREE.RepeatWrapping, wrapT = THREE.RepeatWrapping, repeat = 1 } = {}) => {
     t.wrapS = wrapS; t.wrapT = wrapT;
@@ -116,7 +123,9 @@ export async function createMaterials(ctx) {
   let paintTex;
   if (planksT?.image) paintTex = prep(processed(planksT.image, { desat: 0.92, gain: 1.45 }), { wrapS: M });
   else paintTex = prep(FALLBACK.planks(), { wrapS: M });
-  const cobble = prep(cobbleT ? cobbleT.clone() : FALLBACK.cobble(), { wrapS: M, wrapT: M, repeat: 1 / 2.4 });
+  const CW = cobbleN ? THREE.RepeatWrapping : M;   // the CC0 cobblestone tiles seamlessly; mirroring would flip its normal map
+  const cobble = prep(cobbleT ? cobbleT.clone() : FALLBACK.cobble(), { wrapS: CW, wrapT: CW, repeat: 1 / 2.4 });
+  const cobbleNormal = cobbleN ? prep(cobbleN.clone(), { wrapS: CW, wrapT: CW, repeat: 1 / 2.4 }) : null;
   const ivy = ivyT || FALLBACK.ivy();
   ivy.wrapS = ivy.wrapT = THREE.ClampToEdgeWrapping;
   const flowers = flowersT || FALLBACK.flowers();
@@ -139,7 +148,7 @@ export async function createMaterials(ctx) {
     ivy: createToonMaterial({ ...vc, map: ivy, kind: 'foliage', alphaTest: 0.5, side: THREE.DoubleSide }),
     gold: createToonMaterial({ ...vc, kind: 'metal', color: 0xe2b95b, emissive: 0x3a2a08, emissiveIntensity: 1 }),
     water: createToonMaterial({ ...vc, kind: 'water', color: 0x63c6e0, transparent: true }),
-    cobble: createToonMaterial({ ...vc, map: cobble, kind: 'stone' }),
+    cobble: createToonMaterial({ ...vc, map: cobble, kind: 'stone', ...(cobbleNormal ? { normalMap: cobbleNormal, normalScale: 0.8 } : {}) }),
     leaf: createToonMaterial({ ...vc, kind: 'foliage', color: 0x5f9e45 }),
     aether: createToonMaterial({ ...vc, kind: 'glow', color: 0x7ff5ff, emissive: 0x4fe6ff, emissiveIntensity: 2.2 }),
   };

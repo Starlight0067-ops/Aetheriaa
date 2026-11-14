@@ -160,23 +160,44 @@ function makeReedTexture() {
   return new THREE.CanvasTexture(c);
 }
 
+/** Average colour of an image as a THREE.Color (sRGB input), or null when it cannot be read. */
+function averageColor(img) {
+  try {
+    const c = document.createElement('canvas');
+    c.width = c.height = 32;
+    const g = c.getContext('2d', { willReadFrequently: true });
+    g.drawImage(img, 0, 0, 32, 32);
+    const d = g.getImageData(0, 0, 32, 32).data;
+    const acc = new THREE.Color(0, 0, 0), px = new THREE.Color();
+    for (let i = 0; i < d.length; i += 4) { px.setRGB(d[i] / 255, d[i + 1] / 255, d[i + 2] / 255, THREE.SRGBColorSpace); acc.add(px); }
+    return acc.multiplyScalar(4 / d.length);
+  } catch (e) { return null; }
+}
+
 /** Loads (once) every texture the nature systems use. */
 export function loadNatureTextures(ctx) {
   if (cache) return cache;
   const aniso = ctx.quality.anisotropy || 4;
-  const load = async (name, fallback, opts) => {
-    let t = null;
-    try { t = await ctx.assets.tryTexture(BASE + name); } catch (e) { t = null; }
+  // Third-party CC0 Poly Haven ground textures (public/assets/cc0/ground) replace the painted ones;
+  // ?ground=old keeps the previous set. Every step falls back: CC0 file -> painted file -> procedural canvas.
+  const cc0 = ctx.params?.get('ground') !== 'old';
+  const CC0 = '/assets/cc0/ground/';
+  const load = async (name, fallback, opts, cc0Name = null) => {
+    let t = null, fromCC0 = false;
+    if (cc0 && cc0Name) { try { t = await ctx.assets.tryTexture(CC0 + cc0Name); fromCC0 = !!t; } catch (e) { t = null; } }
+    if (!t) { try { t = await ctx.assets.tryTexture(BASE + name); } catch (e) { t = null; } }
     if (t) { t = t.clone(); t.needsUpdate = true; }
     else { console.warn('[nature] texture missing, using procedural fallback:', name); t = fallback(); }
-    return finish(t, { ...opts, aniso });
+    t = finish(t, { ...opts, aniso });
+    t.userData.cc0 = fromCC0;
+    return t;
   };
   cache = (async () => {
     const [grass, dirt, rock, cobble, bark, broadleaf, pine, blossom, flowers] = await Promise.all([
-      load('grass.jpg', () => fallbackOpaque('grass')),
-      load('dirt_path.jpg', () => fallbackOpaque('dirt')),
+      load('grass.jpg', () => fallbackOpaque('grass'), undefined, 'aerial_grass_rock_diff_1k.jpg'),
+      load('dirt_path.jpg', () => fallbackOpaque('dirt'), undefined, 'dirt_floor_diff_1k.jpg'),
       load('rock_cliff.jpg', () => fallbackOpaque('rock')),
-      load('cobblestone.jpg', () => fallbackOpaque('cobble'), { mirrored: true }),
+      load('cobblestone.jpg', () => fallbackOpaque('cobble'), { mirrored: true }, 'cobblestone_floor_08_diff_1k.jpg'),
       load('bark.jpg', () => fallbackOpaque('bark')),
       load('leaves_broadleaf.png', () => fallbackCard('broadleaf'), { repeat: false }),
       load('leaves_pine.png', () => fallbackCard('pine'), { repeat: false }),
@@ -187,7 +208,8 @@ export function loadNatureTextures(ctx) {
     const birch = finish(makeBirchBark(), { aniso });
     const willow = finish(makeWillowStrands(), { repeat: false, aniso });
     const reed = finish(makeReedTexture(), { repeat: false, aniso });
-    return { grass, dirt, rock, cobble, bark, broadleaf, pine, blossom, flowers, noise, birch, willow, reed };
+    const grassAvg = grass.userData.cc0 ? averageColor(grass.image) : null;   // terrain normalises grass detail by this
+    return { grassAvg, grass, dirt, rock, cobble, bark, broadleaf, pine, blossom, flowers, noise, birch, willow, reed };
   })();
   return cache;
 }

@@ -8,12 +8,17 @@ import { loadKit, StaticBatcher, normalizeGeometry } from './town/batch.js';
 import { makePlan } from './town/plan.js';
 import { buildStreets, buildPlaza, buildSteps, buildPaving } from './town/streets.js';
 import { dressPlaza } from './town/plazadress.js';
-import { loadQuaternius } from './town/quat.js';
+import { loadQuaternius, QUAT_PIECES } from './town/quat.js';
 import { placeLandmarks } from './town/landmarks.js';
 import { placeProps } from './town/props.js';
 import { createDynamics } from './town/dynamic.js';
+import { HOUSE_KIT_PIECES, buildKitHouses } from './town/medievalkit.js';
+import { loadCC0Buildings, addCC0House, buildCC0Houses } from './town/cc0buildings.js';
 
 const BASE = '/assets/town/';
+// per-house tints for the Quaternius kit houses (multiplied with the kit's plaster / roof-tile textures)
+const KIT_PLASTER = [0xffffff, 0xfff1d6, 0xf6e3c4, 0xffe9dc, 0xe9eef2, 0xf7f0e2, 0xf3dcc0, 0xfdf6e8];
+const KIT_ROOF = [0xffffff, 0xf2d9cc, 0xffe2cf, 0xdcc0b4, 0xf5cdb5, 0xcfd6dc, 0xffffff, 0xe8c4ae];
 
 async function fetchJSON(url) {
   try { const r = await fetch(url); if (!r.ok) return null; return await r.json(); } catch { return null; }
@@ -49,8 +54,13 @@ export async function create(ctx) {
     const loads = ['houses', 'landmarks'].map(async (k) => {
       try { kits[k] = await loadKit(ctx, BASE + k + '.glb'); } catch (e) { console.warn('[town] kit missing', k, e?.message || e); kits[k] = new Map(); }
     });
+    // House visuals (?buildings=): 'medieval' (default) = houses assembled from the third-party CC0 Quaternius
+    // Medieval Village kit; 'blocks' = CC0 low-poly block buildings from /assets/cc0; 'kit' = generated half-timbered kit.
+    const mode = ctx.params.get('buildings') || 'medieval';
     let quat = new Map();
-    loads.push(loadQuaternius(ctx, mats).then((m) => { quat = m; }).catch((e) => console.warn('[town] quaternius kit', e)));
+    loads.push(loadQuaternius(ctx, mats, mode === 'medieval' ? [...new Set([...QUAT_PIECES, ...HOUSE_KIT_PIECES])] : QUAT_PIECES).then((m) => { quat = m; }).catch((e) => console.warn('[town] quaternius kit', e)));
+    let cc0 = [];
+    if (mode === 'blocks') loads.push(loadCC0Buildings(ctx).then((m) => { cc0 = m; }).catch((e) => console.warn('[town] cc0 buildings', e)));
     const pending = Promise.all(loads);
     ctx.pending.push(pending);
     await pending;
@@ -60,6 +70,10 @@ export async function create(ctx) {
 
     const plan = makePlan((houseDefs || []).filter((d) => kits.houses.has(d.name)));
     api.plan = plan;
+    const useCC0 = cc0.length > 0;
+    let kitHouses = new Map();
+    if (mode === 'medieval') { try { kitHouses = buildKitHouses(quat, plan.defs || houseDefs || []); } catch (e) { console.warn('[town] medieval kit houses', e); } }
+    plan.cc0Houses = useCC0 || kitHouses.size > 0;   // facade dressing made for the generated kit (vines, balconies) is skipped
     const useBatched = ctx.params.get('townBatch') !== '0';
     const batch = new StaticBatcher(mats, { useBatched });
     const tmpM = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
@@ -73,9 +87,19 @@ export async function create(ctx) {
       tmpM.compose(new THREE.Vector3(h.x, h.floorY, h.z), q, new THREE.Vector3(1, 1, 1));
       const tints = { roof: col('roof', h.tint.roof), plaster: col('plaster', h.tint.plaster), timber: col('timber', h.tint.timber),
         stone: col('stone', h.tint.stone), paint: col('paint', h.tint.paint) };
-      batch.add(p, tmpM, tints, piece(h.def.name + '_L1'));
+      const c0 = Math.cos(h.yaw), s0 = Math.sin(h.yaw);
+      const kh = kitHouses.get(h.def.name);
+      const replaced = useCC0 || !!kh;
+      if (useCC0) addCC0House(cc0, h, Math.floor(Math.abs(h.x * 7.3 + h.z * 3.1)) + h.tint.roof);
+      else if (kh) batch.add(kh, tmpM, { q_plaster: KIT_PLASTER[h.tint.plaster % KIT_PLASTER.length], q_tiles: KIT_ROOF[h.tint.roof % KIT_ROOF.length] });
+      else batch.add(p, tmpM, tints, piece(h.def.name + '_L1'));
+      // stone plinth down to the lowest ground under the footprint (third-party models have no foundation)
+      if (replaced && h.floorY - h.minY > 0.15) {
+        tmpM.compose(new THREE.Vector3(h.x - s0 * h.def.D / 2, h.floorY + 0.02, h.z - c0 * h.def.D / 2), q, new THREE.Vector3(h.def.W + 0.3, h.floorY - h.minY + 1.0, h.def.D + 0.3));
+        batch.add(piece('block'), tmpM, { stone: tints.stone });
+      }
       // deep foundations on steep ground
-      if (h.floorY - h.minY > 3.6) {
+      if (!replaced && h.floorY - h.minY > 3.6) {
         const depth = h.floorY - h.minY + 1.0;
         const c = Math.cos(h.yaw), s = Math.sin(h.yaw);
         const cx = h.x - s * h.def.D / 2, cz = h.z - c * h.def.D / 2;
@@ -116,6 +140,7 @@ export async function create(ctx) {
 
     batch.build(group);
     api.batch = batch;
+    const cc0Count = useCC0 ? buildCC0Houses(cc0, group, { shadows: ctx.quality.shadows }) : 0;
 
     // ---------------- streets + plaza
     try {
@@ -158,7 +183,7 @@ export async function create(ctx) {
       batch.updateLOD(ctx.camera.position, lodDist);
     });
     batch.updateLOD(ctx.camera.position, lodDist);
-    api.stats = { houses: plan.houses.length, tris: Math.round(batch.tris), ms: Math.round(performance.now() - t0), batched: batch.useBatched };
+    api.stats = { houses: plan.houses.length, tris: Math.round(batch.tris), ms: Math.round(performance.now() - t0), batched: batch.useBatched, cc0Houses: cc0Count };
     console.info('[town]', JSON.stringify(api.stats));
   } catch (e) {
     console.error('[town] failed to build Vael Harrow', e);

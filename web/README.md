@@ -35,6 +35,9 @@ http://127.0.0.1:5173/?view=plaza&quality=medium
 | `meadow` | Windmill hills and the western meadows |
 | `portrait` / `fullbody` | Player character close-ups |
 
+Visual sets can be switched back with URL parameters: `buildings=medieval` (default, CC0 Quaternius kit houses) `| blocks | kit`,
+`ground=old` (painted ground textures) and `chars=vrm` (previous characters). See `public/assets/cc0/LICENSES.md`.
+
 Quality presets live in `src/core/quality.js`: `low`, `medium` (default), `high`, `ultra`.
 `low` targets Intel UHD laptops: lower pixel ratio, tighter shadows, no bloom/SMAA/AO.
 

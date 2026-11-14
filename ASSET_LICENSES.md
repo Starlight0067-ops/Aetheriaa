@@ -11,4 +11,20 @@
 | Godot Engine 4.7.2 and export templates | godotengine.org (official GitHub release) | MIT |
 | Blender 5.2 (tool only) | blender.org | GPL (tool). Output assets belong to the project. |
 
-No third-party art, audio or code is bundled. No assets were taken from any existing game.
+The Godot build bundles no third-party art, audio or code. No assets were taken from any existing game.
+
+## Third-party CC0 assets (web prototype)
+
+The web prototype (`web/`) replaces its generated houses, ground textures and characters with third-party
+assets released under **CC0 1.0** (public domain dedication). Attribution is not required; it is given anyway.
+Per-file sources are listed in `web/public/assets/cc0/LICENSES.md`.
+
+| Asset | Used for | Origin | License |
+|---|---|---|---|
+| `web/public/assets/cc0/ground/*` (dirt_floor, aerial_grass_rock, cobblestone_floor_08; diffuse / normal / roughness, 1k) | Terrain grass detail, dirt paths, street and plaza cobblestone | Poly Haven (polyhaven.com), authors eye-candy.xyz and Rob Tuytel | CC0 1.0 |
+| `web/public/assets/cc0/characters/adventurer, hooded_adventurer, rogue, worker (.glb)` | Player (adventurer), elder (hooded adventurer), blacksmith (worker), envoy (rogue) | Quaternius (quaternius.com), via npm `@netforge/asset-library-files` | CC0 1.0 |
+| `web/public/assets/cc0/characters/mini_male_a, mini_female_a (.glb)` | Townsfolk NPCs | Kenney (kenney.nl), via npm `@netforge/asset-library-files` | CC0 1.0 |
+| `web/public/assets/cc0/buildings/*.glb` | Optional block buildings (`?buildings=blocks`) and spare props | Quaternius / Kenney, via npm `@netforge/asset-library-files` | CC0 1.0 |
+| `web/public/assets/free/medieval/*` (Medieval Village MegaKit, standard edition) | Town houses (walls, windows, doors, tiled roofs, chimneys), facade props | Quaternius (quaternius.com); licence text in `LICENSE_License_Standard.txt` in that folder | CC0 1.0 |
+
+No CC-BY or otherwise attribution-bound asset is included.

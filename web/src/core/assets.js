@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
+import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 
 // Shared asset loading with caching. Decoders are served from /draco/ and /basis/.
 export function createAssets(renderer, quality) {
@@ -11,6 +12,7 @@ export function createAssets(renderer, quality) {
   gltf.setDRACOLoader(draco);
   const ktx2 = new KTX2Loader().setTranscoderPath('/basis/').detectSupport(renderer);
   gltf.setKTX2Loader(ktx2);
+  gltf.setMeshoptDecoder(MeshoptDecoder);   // the CC0 packs in /assets/cc0 are meshopt-compressed
   const texLoader = new THREE.TextureLoader();
   const cache = new Map();
 

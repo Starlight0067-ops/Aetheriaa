@@ -190,7 +190,7 @@ function createTerrainMaterial(tex, quality) {
     uniforms: {
       uSplatA: { value: tex.splatA }, uSplatB: { value: tex.splatB }, uNoiseTex: WIND.uNoiseTex,
       uGrassTex: { value: tex.grass }, uDirtTex: { value: tex.dirt }, uRockTex: { value: tex.rock }, uCobbleTex: { value: tex.cobble },
-      uGrassAvg: { value: c(0x63ae25) },
+      uGrassAvg: { value: tex.grassAvg || c(0x63ae25) },
       uLush: { value: c(0x5fb444) }, uLight: { value: c(0x9ad25c) }, uDeep: { value: c(0x3f9440) },
       uGolden: { value: c(0xc2c25e) }, uForest: { value: c(0x3c7a3c) }, uSand: { value: c(0xd8c79c) }, uSnow: { value: c(0xf2f6ff) },
       uHaze: HAZE.uHaze,

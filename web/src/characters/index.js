@@ -28,6 +28,14 @@ import { CATALOG } from './catalog.js';
 export { ACTIONS, CATALOG };
 
 export async function createCharacter(ctx, id, opts = {}) {
+  // Third-party CC0 rigged characters first (see cc0.js); ?chars=vrm or opts.cc0 === false keeps the VRM / generated cast.
+  if (opts.cc0 !== false && ctx?.params?.get('chars') !== 'vrm' && ctx?.assets?.loadGLTF) {
+    try {
+      const { createCC0Character } = await import('./cc0.js');
+      const ch = await createCC0Character(ctx, id, opts);
+      if (ch) return ch;
+    } catch (e) { console.warn(`[characters] CC0 model for ${id} failed, using the previous character:`, e); }
+  }
   const TARGET_HEIGHT = { kael: 1.75, lyra: 1.62, maren: 1.67, wenna: 1.58, toma: 1.48, ostin: 1.68, hesk: 1.86, veyra: 1.72 };
   const object = new THREE.Group();
   object.name = `character_${id}`;

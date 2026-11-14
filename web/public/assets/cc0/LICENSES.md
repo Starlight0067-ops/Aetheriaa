@@ -64,3 +64,10 @@ Los archivos de personajes de Quaternius tienen 24 animaciones, incluidas Idle y
 - Todos los `.glb` empiezan por la cabecera `glTF`.
 - Las URLs de Poly Haven se obtuvieron de su API. Las URLs de Quaternius y Kenney se toman del NOTICE del paquete npm y de las páginas de pack de Quaternius (`quaternius.com/packs/*`, que indican "License CC0").
 - Los packs de Quaternius se descargan desde itch.io (`quaternius.itch.io`), que no está en la lista de hosts permitidos, así que no se usaron directamente.
+
+## Uso en el prototipo web
+
+- `ground/`: los difusos sustituyen a las texturas pintadas de hierba, tierra y adoquín del terreno (`src/world/nature/textures.js`); el adoquín (difuso + normal) se usa también en calles y plaza (`src/world/town/materials.js`). Los mapas de rugosidad no se usan: los materiales del juego son toon y no tienen canal de rugosidad. `?ground=old` vuelve a las texturas anteriores.
+- `characters/`: jugador y NPCs (`src/characters/cc0.js`), con `AnimationMixer` (idle / walk / run). `?chars=vrm` vuelve a los personajes anteriores.
+- `buildings/building_*.glb`: son bloques de estilo urbano moderno (tejado plano), que no encajan en la villa medieval; solo se usan con `?buildings=blocks` (`src/world/town/cc0buildings.js`). Las casas por defecto se montan con el kit CC0 "Medieval Village MegaKit" de Quaternius que ya estaba en `public/assets/free/medieval/` (licencia en `LICENSE_License_Standard.txt` de esa carpeta). `?buildings=kit` vuelve a las casas generadas.
+- `buildings/` (fence, barrel(s), crate, chest, campfire, tent, stump, column): todavía sin usar.

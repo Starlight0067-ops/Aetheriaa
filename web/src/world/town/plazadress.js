@@ -168,7 +168,7 @@ export function dressPlaza(ctx, plan, piece, batch, dyn) {
 
   // ---------- vines on plaza / main street / market facades (CC0 Quaternius)
   const vines = ['Prop_Vine1', 'Prop_Vine2'].map(q).filter(Boolean);
-  if (vines.length) {
+  if (vines.length && !plan.cc0Houses) {
     for (const h of plan.houses) {
       if (!(h.street === 'plaza' || h.street === 'main' || h.street === 'market') || R() < 0.45) continue;
       const c = Math.cos(h.yaw), s = Math.sin(h.yaw);
@@ -181,7 +181,7 @@ export function dressPlaza(ctx, plan, piece, batch, dyn) {
 
   // ---------- CC0 kit balconies (wood floor + cross railing + braces) on first floors facing the plaza / main street
   const rail = q('Balcony_Cross_Straight'), floor = q('Floor_WoodDark'), brace = q('Prop_Support');
-  if (rail && floor) {
+  if (rail && floor && !plan.cc0Houses) {
     for (const h of plan.houses) {
       if (!(h.street === 'plaza' || h.street === 'main') || h.def.U < 1 || R() < 0.5) continue;
       const n = Math.max(1, Math.floor((h.def.W - 0.8) / 1.75));
