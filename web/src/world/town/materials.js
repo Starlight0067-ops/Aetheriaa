@@ -2,6 +2,7 @@
 // Painted textures come from public/assets/textures; every slot has a procedural canvas fallback.
 import * as THREE from 'three';
 import { createToonMaterial } from '../../render/toon.js';
+import { deriveNormalMap } from '../../render/detailmaps.js';
 
 const TEX = '/assets/textures/';
 
@@ -94,11 +95,12 @@ export async function createMaterials(ctx) {
   const names = ['roof_tiles.jpg', 'plaster.jpg', 'timber.jpg', 'stone_wall.jpg', 'wood_planks.jpg', 'cobblestone.jpg', 'ivy.png', 'flowers.png'];
   let [roofT, plasterT, timberT, stoneT, planksT, cobbleT, ivyT, flowersT] = await Promise.all(names.map(load));
   // third-party CC0 Poly Haven cobblestone (albedo + normal) for streets and plaza; ?ground=old keeps the painted one
-  let cobbleN = null;
+  let cobbleN = null, cobbleR = null;
   if (ctx.params?.get('ground') !== 'old') {
     const CC0 = '/assets/cc0/ground/cobblestone_floor_08_';
-    const [d, n] = await Promise.all([A.tryTexture(CC0 + 'diff_1k.jpg'), A.tryTexture(CC0 + 'nor_gl_1k.jpg', { srgb: false })]);
-    if (d) { cobbleT = d; cobbleN = n || null; }
+    const pbr = ctx.quality.pbrSpecular !== false;
+    const [d, n, r] = await Promise.all([A.tryTexture(CC0 + 'diff_1k.jpg'), A.tryTexture(CC0 + 'nor_gl_1k.jpg', { srgb: false }), pbr ? A.tryTexture(CC0 + 'rough_1k.jpg', { srgb: false }) : null]);
+    if (d) { cobbleT = d; cobbleN = n || null; cobbleR = r || null; }
   }
 
   const prep = (t, { wrapS = THREE.RepeatWrapping, wrapT = THREE.RepeatWrapping, repeat = 1 } = {}) => {
@@ -126,20 +128,27 @@ export async function createMaterials(ctx) {
   const CW = cobbleN ? THREE.RepeatWrapping : M;   // the CC0 cobblestone tiles seamlessly; mirroring would flip its normal map
   const cobble = prep(cobbleT ? cobbleT.clone() : FALLBACK.cobble(), { wrapS: CW, wrapT: CW, repeat: 1 / 2.4 });
   const cobbleNormal = cobbleN ? prep(cobbleN.clone(), { wrapS: CW, wrapT: CW, repeat: 1 / 2.4 }) : null;
+  const cobbleRough = cobbleR ? prep(cobbleR.clone(), { wrapS: CW, wrapT: CW, repeat: 1 / 2.4 }) : null;
   const ivy = ivyT || FALLBACK.ivy();
   ivy.wrapS = ivy.wrapT = THREE.ClampToEdgeWrapping;
   const flowers = flowersT || FALLBACK.flowers();
   flowers.wrapS = flowers.wrapT = THREE.ClampToEdgeWrapping;
 
   const vc = { vertexColors: true };
+  // relief derived from the albedo (PBR detail); mirrored-S textures only get vertical relief (see detailmaps.js)
+  const nm = (t, strength) => {
+    if (!ctx.quality.normalMaps || !t?.image) return {};
+    const n = deriveNormalMap(t, { strength, axis: t.wrapS === M ? 'y' : 'xy' });
+    return n ? { normalMap: n, normalScale: 1.0 } : {};
+  };
   const mats = {
-    roof: createToonMaterial({ ...vc, map: roof, kind: 'roof' }),
-    slate: createToonMaterial({ ...vc, map: slateTex, kind: 'roof', color: 0x5d8f9c }),
-    plaster: createToonMaterial({ ...vc, map: plaster, kind: 'plaster' }),
-    timber: createToonMaterial({ ...vc, map: timber, kind: 'wood' }),
-    stone: createToonMaterial({ ...vc, map: stone, kind: 'stone', color: 0xf2eee6 }),
-    planks: createToonMaterial({ ...vc, map: planks, kind: 'wood' }),
-    paint: createToonMaterial({ ...vc, map: paintTex, kind: 'wood' }),
+    roof: createToonMaterial({ ...vc, map: roof, kind: 'roof', ...nm(roof, 3.0) }),
+    slate: createToonMaterial({ ...vc, map: slateTex, kind: 'roof', color: 0x5d8f9c, ...nm(slateTex, 3.0) }),
+    plaster: createToonMaterial({ ...vc, map: plaster, kind: 'plaster', ...nm(plaster, 1.2) }),
+    timber: createToonMaterial({ ...vc, map: timber, kind: 'wood', ...nm(timber, 2.0) }),
+    stone: createToonMaterial({ ...vc, map: stone, kind: 'stone', color: 0xf2eee6, ...nm(stone, 3.0) }),
+    planks: createToonMaterial({ ...vc, map: planks, kind: 'wood', ...nm(planks, 2.2) }),
+    paint: createToonMaterial({ ...vc, map: paintTex, kind: 'wood', ...nm(paintTex, 1.8) }),
     glass: createToonMaterial({ ...vc, kind: 'metal', color: 0xffffff }),
     metal: createToonMaterial({ ...vc, kind: 'metal', color: 0x4a4650 }),
     cloth: createToonMaterial({ ...vc, kind: 'cloth', side: THREE.DoubleSide }),
@@ -148,14 +157,21 @@ export async function createMaterials(ctx) {
     ivy: createToonMaterial({ ...vc, map: ivy, kind: 'foliage', alphaTest: 0.5, side: THREE.DoubleSide }),
     gold: createToonMaterial({ ...vc, kind: 'metal', color: 0xe2b95b, emissive: 0x3a2a08, emissiveIntensity: 1 }),
     water: createToonMaterial({ ...vc, kind: 'water', color: 0x63c6e0, transparent: true }),
-    cobble: createToonMaterial({ ...vc, map: cobble, kind: 'stone', ...(cobbleNormal ? { normalMap: cobbleNormal, normalScale: 0.8 } : {}) }),
+    cobble: createToonMaterial({ ...vc, map: cobble, kind: 'stone', ...(cobbleNormal ? { normalMap: cobbleNormal, normalScale: 0.8 } : {}), ...(cobbleRough ? { roughnessMap: cobbleRough, roughness: 1.0 } : {}) }),
     leaf: createToonMaterial({ ...vc, kind: 'foliage', color: 0x5f9e45 }),
     aether: createToonMaterial({ ...vc, kind: 'glow', color: 0x7ff5ff, emissive: 0x4fe6ff, emissiveIntensity: 2.2 }),
   };
   if (mats.water.opacity !== undefined) mats.water.opacity = 0.85;
   for (const [k, m] of Object.entries(mats)) m.name = 'town_' + k;
   // street surface sits on the terrain: pull it forward in depth to avoid z-fighting
-  mats.cobble.polygonOffset = true; mats.cobble.polygonOffsetFactor = -2; mats.cobble.polygonOffsetUnits = -4;
+  // Depth layering for stacked ground surfaces (terrain < plaza paving < street treads < inlaid stone strips).
+  // Real geometric separation is kept in streets.js; polygon offset makes the order hold at any distance.
+  const cobbleOpts = { ...vc, map: cobble, kind: 'stone', ...(cobbleNormal ? { normalMap: cobbleNormal, normalScale: 0.8 } : {}), ...(cobbleRough ? { roughnessMap: cobbleRough, roughness: 1.0 } : {}) };
+  mats.cobbleStreet = createToonMaterial(cobbleOpts);
+  mats.stoneDecal = createToonMaterial({ ...vc, map: stone, kind: 'stone', color: 0xf2eee6 });
+  mats.cobbleStreet.name = 'town_cobbleStreet'; mats.stoneDecal.name = 'town_stoneDecal';
+  const layer = (m, k) => { m.polygonOffset = true; m.polygonOffsetFactor = -2 * k; m.polygonOffsetUnits = -4 * k; };
+  layer(mats.cobble, 1); layer(mats.cobbleStreet, 2); layer(mats.stoneDecal, 3);
   return { mats, textures: { roof, slateTex, plaster, timber, stone, planks, paintTex, cobble, ivy, flowers }, missing: names.filter((n, i) => ![roofT, plasterT, timberT, stoneT, planksT, cobbleT, ivyT, flowersT][i]) };
 }
 

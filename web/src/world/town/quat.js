@@ -4,6 +4,7 @@
 // kept as maps on toon materials created through createToonMaterial.
 import * as THREE from 'three';
 import { createToonMaterial } from '../../render/toon.js';
+import { deriveNormalMap } from '../../render/detailmaps.js';
 import { normalizeGeometry } from './batch.js';
 
 const DIR = '/assets/free/medieval/';
@@ -41,7 +42,9 @@ export async function loadQuaternius(ctx, mats, names = QUAT_PIECES) {
         if (map) { map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = ctx.quality.anisotropy || 4; }
         const isVine = slot[0] === 'q_vine';
         const isGlass = slot[0] === 'q_glass';
+        const nrm = !isGlass && !isVine && map && ctx.quality.normalMaps ? deriveNormalMap(map, { strength: slot[1] === 'plaster' ? 1.4 : 2.6 }) : null;
         mats[slot[0]] = createToonMaterial({
+          ...(nrm ? { normalMap: nrm } : {}),
           map: isGlass ? null : map, vertexColors: true, kind: slot[1], side: THREE.DoubleSide,
           color: isGlass ? 0x5d8fb0 : (isVine ? 0x6fae4a : 0xffffff),
           alphaTest: isVine ? 0.5 : 0, alphaMap: isVine ? map : null,

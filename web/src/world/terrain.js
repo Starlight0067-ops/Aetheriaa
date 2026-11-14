@@ -3,7 +3,8 @@
 // splat shader (grass variants, meadow flowers, dirt paths, triplanar cliffs, riverbank sand/pebbles,
 // damp soil, town cobbles, forest floor, snow on the rim peaks) injected into the toon 'ground' material.
 import * as THREE from 'three';
-import { WORLD, heightAt } from '../core/layout.js';
+import { WORLD, POI, heightAt } from '../core/layout.js';
+import { streetList } from './town/plan.js';
 import { createToonMaterial } from '../render/toon.js';
 import { getWorldData, MASK_RES, splatAt, pathDist, inTown } from './nature/worlddata.js';
 import { loadNatureTextures } from './nature/textures.js';
@@ -32,6 +33,45 @@ export function visualHeightAt(x, z) {
   return h + (m - h) * k;
 }
 
+// Paved footprint (streets, plaza, stair sector, gate square) rasterised once at 0.25 m/texel. The terrain
+// fragment shader discards under it: the LOD-dependent terrain surface can never poke through or z-fight the
+// pavement meshes, whatever the camera distance. Footprints are shrunk so pavement always overlaps the hole.
+const PAVE = { x0: -116, z0: -144, size: 264, res: 1024 };
+function makePavementMask() {
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = PAVE.res;
+  const g = cv.getContext('2d');
+  const k = PAVE.res / PAVE.size;
+  g.fillStyle = '#000'; g.fillRect(0, 0, PAVE.res, PAVE.res);
+  g.setTransform(k, 0, 0, k, -PAVE.x0 * k, -PAVE.z0 * k);
+  g.fillStyle = g.strokeStyle = '#fff';
+  g.lineJoin = 'round'; g.lineCap = 'butt';
+  for (const st of streetList()) {
+    g.lineWidth = Math.max(0.5, st.w - 1.1);
+    g.beginPath();
+    st.pts.forEach(([x, z], i) => (i ? g.lineTo(x, z) : g.moveTo(x, z)));
+    g.stroke();
+  }
+  const { x: cx, z: cz, r } = POI.plaza;
+  g.beginPath(); g.arc(cx, cz, r - 0.8, 0, Math.PI * 2); g.fill();
+  // stair sector between the plaza and the hall (see town/plazadress.js `sector`)
+  const d = Math.PI / 180;
+  g.beginPath(); g.arc(cx, cz, 40.3, 37 * d + 0.03, 79 * d - 0.03); g.arc(cx, cz, r - 1.5, 79 * d - 0.03, 37 * d + 0.03, true); g.closePath(); g.fill();
+  // gate square (see town.js `gatePoly`), shrunk toward its centroid
+  const gate = [[-61, 4.5], [-42, 6.5], [-37, 11], [-39, 21], [-50, 24], [-61, 15]];
+  const gx = gate.reduce((a, p) => a + p[0], 0) / gate.length, gz = gate.reduce((a, p) => a + p[1], 0) / gate.length;
+  g.beginPath();
+  gate.forEach(([x, z], i) => { const px = gx + (x - gx) * 0.9, pz = gz + (z - gz) * 0.9; i ? g.lineTo(px, pz) : g.moveTo(px, pz); });
+  g.closePath(); g.fill();
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.NoColorSpace;
+  t.generateMipmaps = false;
+  t.minFilter = t.magFilter = THREE.LinearFilter;
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  t.flipY = false;
+  return t;
+}
+
 function makeSplatTexture(data) {
   const t = new THREE.DataTexture(data, MASK_RES, MASK_RES, THREE.RGBAFormat);
   t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
@@ -54,6 +94,7 @@ uniform sampler2D uGrassTex;
 uniform sampler2D uDirtTex;
 uniform sampler2D uRockTex;
 uniform sampler2D uCobbleTex;
+uniform sampler2D uPaveMask;
 uniform vec3 uGrassAvg;
 uniform vec3 uLush;
 uniform vec3 uLight;
@@ -68,6 +109,10 @@ vec3 natLuma3(vec3 c) { return vec3(dot(c, vec3(0.299, 0.587, 0.114))); }
 const TERRAIN_FRAG = /* glsl */`
 {
   vec2 wxz = vTW.xz;
+  {
+    vec2 puv = ( wxz - vec2( -116.0, -144.0 ) ) / 264.0;
+    if ( puv.x > 0.0 && puv.x < 1.0 && puv.y > 0.0 && puv.y < 1.0 && texture2D( uPaveMask, puv ).r > 0.75 ) discard;
+  }
   vec2 suv = (wxz + ${HALF.toFixed(1)}) / ${(HALF * 2).toFixed(1)};
   vec4 sA = texture2D(uSplatA, suv);
   vec4 sB = texture2D(uSplatB, suv);
@@ -189,7 +234,7 @@ function createTerrainMaterial(tex, quality) {
     defines: quality.name === 'low' ? { TERRAIN_LQ: '' } : {},
     uniforms: {
       uSplatA: { value: tex.splatA }, uSplatB: { value: tex.splatB }, uNoiseTex: WIND.uNoiseTex,
-      uGrassTex: { value: tex.grass }, uDirtTex: { value: tex.dirt }, uRockTex: { value: tex.rock }, uCobbleTex: { value: tex.cobble },
+      uPaveMask: { value: makePavementMask() }, uGrassTex: { value: tex.grass }, uDirtTex: { value: tex.dirt }, uRockTex: { value: tex.rock }, uCobbleTex: { value: tex.cobble },
       uGrassAvg: { value: tex.grassAvg || c(0x63ae25) },
       uLush: { value: c(0x5fb444) }, uLight: { value: c(0x9ad25c) }, uDeep: { value: c(0x3f9440) },
       uGolden: { value: c(0xc2c25e) }, uForest: { value: c(0x3c7a3c) }, uSand: { value: c(0xd8c79c) }, uSnow: { value: c(0xf2f6ff) },

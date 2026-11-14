@@ -4,6 +4,7 @@
 // model mesh keeps the draw calls low. Disable with ?buildings=kit.
 import * as THREE from 'three';
 import { createToonMaterial } from '../../render/toon.js';
+import { deriveNormalMap } from '../../render/detailmaps.js';
 
 const DIR = '/assets/cc0/buildings/';
 const NAMES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map((k) => 'building_' + k);
@@ -28,7 +29,8 @@ export async function loadCC0Buildings(ctx) {
       let m = matCache.get(src);
       if (!m) {
         if (src.map) { src.map.colorSpace = THREE.SRGBColorSpace; src.map.anisotropy = ctx.quality.anisotropy || 4; }
-        m = createToonMaterial({ map: src.map || null, color: src.color ? src.color.clone() : 0xffffff, kind: 'plaster' });
+        const nrm = src.map && ctx.quality.normalMaps ? deriveNormalMap(src.map, { strength: 2.2 }) : null;
+        m = createToonMaterial({ map: src.map || null, color: src.color ? src.color.clone() : 0xffffff, kind: 'plaster', ...(nrm ? { normalMap: nrm } : {}) });
         m.name = 'cc0_building';
         matCache.set(src, m);
       }

@@ -10,7 +10,7 @@ import { CSM } from 'three/examples/jsm/csm/CSM.js';
 import { CSMShader } from 'three/examples/jsm/csm/CSMShader.js';
 import { initToon, setCSM, registerLitMaterial } from './toon.js';
 
-export const SUN_INTENSITY = 2.55;
+export const SUN_INTENSITY = 2.9;
 
 function patchCSMChunk(THREE) {
   // In the USE_CSM branch, every cascade light must shine with light 0's colour (others are 0-intensity).
@@ -35,7 +35,7 @@ export async function create(ctx) {
   const sunColor = new THREE.Color(0xfff0dc);
 
   // Sky-tinted fill: cool blue from above, warm green-ochre bounce from the ground.
-  const hemi = new THREE.HemisphereLight(0xbcdcff, 0xa39a74, 1.62);
+  const hemi = new THREE.HemisphereLight(0xc4dcff, 0xa39a74, 1.42);
   hemi.position.set(0, 1, 0);
   scene.add(hemi);
 

@@ -8,6 +8,7 @@ import {
   BloomEffect, SMAAEffect, SMAAPreset,
 } from 'postprocessing';
 import { setOutlineViewport } from './toon.js';
+import { heightAt } from '../core/layout.js';
 
 const AO_FRAG = /* glsl */`
 uniform float uTanHalfFov;
@@ -149,7 +150,7 @@ export async function create(ctx) {
   const { THREE, renderer, scene, camera, quality } = ctx;
   renderer.toneMapping = THREE.NoToneMapping;
   const lighting = ctx.systems.lighting;
-  let composer = null, grade = null, ao = null, bloom = null, smaaPass = null;
+  let composer = null, grade = null, ao = null, bloom = null, smaaPass = null, mainPass = null;
 
   try {
     composer = new EffectComposer(renderer, { frameBufferType: THREE.HalfFloatType, multisampling: 0 });
@@ -162,10 +163,11 @@ export async function create(ctx) {
       bloom = new BloomEffect({ mipmapBlur: true, luminanceThreshold: 1.35, luminanceSmoothing: 0.35, intensity: 0.85, radius: 0.72, levels: 7 });
       effects.push(bloom);
     }
-    const ink = quality.name === 'low' ? 0.0 : (quality.outlines === 'all' ? 0.75 : 0.5);
+    const ink = quality.ink ?? (quality.name === 'low' ? 0.0 : 0.2);   // subtle depth ink: PBR world, crisp silhouettes
     grade = new GradeEffect(THREE, ink);
     effects.push(grade);
-    composer.addPass(new EffectPass(camera, ...effects));
+    mainPass = new EffectPass(camera, ...effects);
+    composer.addPass(mainPass);
     if (quality.smaa) {
       try {
         smaaPass = new EffectPass(camera, new SMAAEffect({ preset: SMAAPreset.HIGH }));
@@ -202,11 +204,77 @@ export async function create(ctx) {
     ctx.pending.push(import('./showcase.js').then((m) => m.buildShowcase(ctx)).catch((e) => console.warn('[pipeline] showcase', e)));
   }
 
+  // ── Depth precision ────────────────────────────────────────────────────────────────────────────
+  // z-buffer resolution is ∝ 1/near. Gameplay keeps a tight near plane (camera hugs walls); the locked
+  // aerial / vista cameras sit tens of metres above everything, so the near plane is pushed out there and
+  // far-away coplanar-ish layers (paving, inlays, roof trims) keep millimetre precision instead of shimmering.
+  let nearCur = camera.near;
+  function syncNear() {
+    let want = 0.2;
+    if (ctx.cameraLocked || rv) {
+      const h = camera.position.y - heightAt(camera.position.x, camera.position.z);
+      want = h > 45 ? 2.5 : h > 22 ? 1.2 : h > 10 ? 0.5 : 0.2;
+    }
+    if (want === nearCur) return;
+    nearCur = want;
+    camera.near = want;
+    camera.updateProjectionMatrix();
+    for (const p of [mainPass, smaaPass]) if (p) p.mainCamera = camera;   // depth-reading effects re-read near/far
+  }
+
+  // ── Auto quality governor (only when the preset was chosen automatically) ───────────────────────
+  // Holds ~60 fps by trading resolution first (cheapest, invisible on high-DPR phones), then post passes,
+  // then sun shadows. Resolution recovers when there is headroom; dropped passes stay off for the session.
+  const gov = { on: !!quality.auto && !ctx.shot, base: renderer.getPixelRatio(), scale: 1, stage: 0, t0: 0, frames: 0, skip: 3, good: 0 };
+  function applyScale() {
+    renderer.setPixelRatio(gov.base * gov.scale);
+    renderer.setSize(innerWidth, innerHeight);
+    composer?.setSize(innerWidth, innerHeight);
+  }
+  function dropStage() {
+    gov.stage++;
+    if (gov.stage === 1 && smaaPass && smaaPass.enabled) {
+      smaaPass.enabled = false; smaaPass.renderToScreen = false;
+      if (mainPass) mainPass.renderToScreen = true;
+      return true;
+    }
+    if (gov.stage <= 2) {
+      gov.stage = 2;
+      const lights = lighting?.csm ? lighting.csm.lights : (lighting?.sun ? [lighting.sun] : []);
+      for (const l of lights) l.castShadow = false;
+      return lights.length > 0;
+    }
+    return false;
+  }
+  function govern() {
+    if (!gov.on || document.hidden) { gov.t0 = 0; return; }
+    const now = performance.now();
+    if (!gov.t0) { gov.t0 = now; gov.frames = 0; return; }
+    gov.frames++;
+    const el = now - gov.t0;
+    if (el < 1200) return;
+    const fps = gov.frames * 1000 / el;
+    gov.t0 = now; gov.frames = 0;
+    if (gov.skip > 0) { gov.skip--; return; }
+    if (fps < 43) {
+      gov.good = 0;
+      const min = quality.minScale ?? 0.6;
+      if (gov.scale > min + 0.01) { gov.scale = Math.max(min, gov.scale * (fps < 28 ? 0.75 : 0.87)); applyScale(); }
+      else if (fps < 36) dropStage();
+      gov.skip = 1;
+    } else if (fps > 57 && gov.scale < 1) {
+      if (++gov.good >= 4) { gov.good = 0; gov.scale = Math.min(1, gov.scale * 1.1); applyScale(); gov.skip = 1; }
+    } else gov.good = 0;
+    window.__AETHERIA_GOV = { fps, scale: gov.scale, stage: gov.stage };
+  }
+
   function render(dt) {
     if (rv) {
       camera.fov = rv.fov; camera.updateProjectionMatrix();
       camera.position.set(...rv.pos); camera.lookAt(new THREE.Vector3(...rv.target));
     }
+    syncNear();
+    govern();
     try { lighting?.preRender?.(); } catch (e) { console.warn('[pipeline] preRender', e); }
     syncView();
     if (composer) composer.render(dt);

@@ -79,6 +79,7 @@ function profile(st, ds) {
 export function buildStreets(streets, mats, opts = {}) {
   const top = new GeoBuf();      // cobbles
   const edge = new GeoBuf();     // curbs, risers, skirts (stone)
+  const strip = new GeoBuf();    // inlaid nosing strips (own depth layer: never z-fights the treads)
   const colliders = [];
   const ds = 0.5;
   for (const st of streets) {
@@ -99,7 +100,7 @@ export function buildStreets(streets, mats, opts = {}) {
         edge.toward(P, yn > yb ? [-b.tx, 0, -b.tz] : [b.tx, 0, b.tz], 'wall', 0.85);
         // stone nosing strip
         const sg = yn > yb ? 1 : -1;
-        edge.toward([L(b, hi + 0.02, -1), L(b, hi + 0.02, 1), [b.x + b.nx * hw + sg * b.tx * 0.12, hi + 0.02, b.z + b.nz * hw + sg * b.tz * 0.12], [b.x - b.nx * hw + sg * b.tx * 0.12, hi + 0.02, b.z - b.nz * hw + sg * b.tz * 0.12]], UP, 'xz', 1.05);
+        strip.toward([L(b, hi + 0.03, -1), L(b, hi + 0.03, 1), [b.x + b.nx * hw + sg * b.tx * 0.12, hi + 0.03, b.z + b.nz * hw + sg * b.tz * 0.12], [b.x - b.nx * hw + sg * b.tx * 0.12, hi + 0.03, b.z - b.nz * hw + sg * b.tz * 0.12]], UP, 'xz', 1.05);
       }
       // curbs + skirts on both sides
       for (const side of [-1, 1]) {
@@ -137,7 +138,8 @@ export function buildStreets(streets, mats, opts = {}) {
       colliders.push({ kind: 'mesh', object: m });
     }
   }
-  const meshes = [new THREE.Mesh(top.geometry(), mats.cobble), new THREE.Mesh(edge.geometry(), mats.stone)];
+  const meshes = [new THREE.Mesh(top.geometry(), mats.cobbleStreet || mats.cobble), new THREE.Mesh(edge.geometry(), mats.stone)];
+  if (strip.i.length) meshes.push(new THREE.Mesh(strip.geometry(), mats.stoneDecal || mats.stone));
   for (const m of meshes) { m.receiveShadow = true; m.castShadow = false; }
   meshes[1].castShadow = true;
   return { meshes, colliders };
@@ -170,14 +172,14 @@ export function buildPlaza(mats) {
       deco.toward([p(r1, a0, y), p(r1, a1, y), p(r1, a1, y + h), p(r1, a0, y + h)], [Math.cos(am), 0, Math.sin(am)], 'wall', 0.9);
     }
   };
-  hexBand(6.4, 7.2, 0.07);
-  hexBand(10.6, 11.0, 0.05, 0);
+  hexBand(6.4, 7.2, 0.09);
+  hexBand(10.6, 11.0, 0.08, 0);
   for (let k = 0; k < 6; k++) {
     const a = k * Math.PI / 3 + Math.PI / 6;
     const mx = cx + 15 * Math.cos(a), mz = cz + 15 * Math.sin(a);
     for (let q = 0; q < 6; q++) {
       const b0 = q * Math.PI / 3, b1 = (q + 1) * Math.PI / 3;
-      deco.toward([[mx, y + 0.06, mz], [mx + 1.1 * Math.cos(b1), y + 0.06, mz + 1.1 * Math.sin(b1)], [mx + 1.1 * Math.cos(b0), y + 0.06, mz + 1.1 * Math.sin(b0)]], UP, 'xz', 1.12);
+      deco.toward([[mx, y + 0.09, mz], [mx + 1.1 * Math.cos(b1), y + 0.09, mz + 1.1 * Math.sin(b1)], [mx + 1.1 * Math.cos(b0), y + 0.09, mz + 1.1 * Math.sin(b0)]], UP, 'xz', 1.12);
     }
   }
   // curb ring + skirt to the terrain outside
@@ -192,7 +194,7 @@ export function buildPlaza(mats) {
     deco.toward([p(R + 0.5, a0, g0), p(R + 0.5, a1, g1), p(R + 0.5, a1, y + 0.22), p(R + 0.5, a0, y + 0.22)], out, 'wall', [0.7, 0.7, 1, 1]);
   }
   const m1 = new THREE.Mesh(pave.geometry(), mats.cobble);
-  const m2 = new THREE.Mesh(deco.geometry(), mats.stone);
+  const m2 = new THREE.Mesh(deco.geometry(), mats.stoneDecal || mats.stone);
   m1.receiveShadow = m2.receiveShadow = true;
   return [m1, m2];
 }
@@ -202,7 +204,7 @@ export function buildPlaza(mats) {
  *  amphitheatre: risers face the plaza, small side risers appear where the hill rises across the sector.
  *  sector: { cx, cz, y0, a0, a1 (radians), r0, r1 } */
 export function buildSteps(mats, sec) {
-  const top = new GeoBuf(), edge = new GeoBuf(), col = new GeoBuf();
+  const top = new GeoBuf(), edge = new GeoBuf(), col = new GeoBuf(), strip = new GeoBuf();
   const N = Math.max(8, Math.round((sec.a1 - sec.a0) * 28));
   const dr = 0.5;
   const rings = [];
@@ -232,7 +234,7 @@ export function buildSteps(mats, sec) {
       const am = (a0 + a1) / 2, inward = out(am).map((v) => -v);
       if (y - yPrev > 0.01) {
         edge.toward([P(ra, a0, yPrev), P(ra, a1, yPrev), P(ra, a1, y), P(ra, a0, y)], inward, 'wall', 0.82);
-        edge.toward([P(ra - 0.05, a0, y + 0.025), P(ra - 0.05, a1, y + 0.025), P(ra + 0.14, a1, y + 0.025), P(ra + 0.14, a0, y + 0.025)], UP, 'xz', 1.12);
+        strip.toward([P(ra - 0.05, a0, y + 0.03), P(ra - 0.05, a1, y + 0.03), P(ra + 0.14, a1, y + 0.03), P(ra + 0.14, a0, y + 0.03)], UP, 'xz', 1.12);
       }
       if (k + 1 < N) {
         const yn = H[i][k + 1];
@@ -273,7 +275,8 @@ export function buildSteps(mats, sec) {
       col.toward([P(rings[i], A(k), ya), P(rings[i], A(k2), ya), P(rings[j + 1], A(k2), yb), P(rings[j + 1], A(k), yb)], UP);
     }
   }
-  const meshes = [new THREE.Mesh(top.geometry(), mats.cobble), new THREE.Mesh(edge.geometry(), mats.stone)];
+  const meshes = [new THREE.Mesh(top.geometry(), mats.cobbleStreet || mats.cobble), new THREE.Mesh(edge.geometry(), mats.stone)];
+  if (strip.i.length) meshes.push(new THREE.Mesh(strip.geometry(), mats.stoneDecal || mats.stone));
   meshes.forEach((m) => { m.receiveShadow = true; });
   meshes[1].castShadow = true;
   const cm = new THREE.Mesh(col.geometry());
@@ -308,7 +311,7 @@ export function buildPaving(mats, poly, step = 1.0, lift = 0.16) {
       top.toward(P, UP, 'xz', 1);
     }
   }
-  const m = new THREE.Mesh(top.geometry(), mats.cobble);
+  const m = new THREE.Mesh(top.geometry(), mats.cobbleStreet || mats.cobble);
   m.receiveShadow = true;
   return m;
 }

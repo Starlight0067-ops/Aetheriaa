@@ -15,6 +15,7 @@
 //     translucency (foliage/grass backlight), sphereBlend (0..1, foliage `sphereNormal` attribute weight),
 //     upNormal (0..1, bend lighting normal to world-up — grass), shadowBias (extra world-space bias, metres),
 //     litScale (multiplies sun), ambScale (multiplies sky ambient)
+//     PBR: pbr (0 anime terminator .. 1 physically based), wrap (diffuse wrap), roughness, roughnessMap, metalness
 //     outline     stored in material.userData.outline (informational; call createOutline yourself)
 //   ── Shader hooks (for wind, dissolves, etc.) ──
 //     uniforms        { name: {value} }  merged into the shader (keep the objects to animate them)
@@ -60,21 +61,24 @@ const TINT = (() => {
 })();
 const WARM_TINT = new THREE.Color(1.35, 0.82, 0.86);   // skin: warm reddish shade (anime convention)
 
+// Per-kind shading preset. `pbr` blends the anime terminator (0) into physically based shading (1): wrapped
+// Lambert + GGX sun highlight + sky-gradient image-based specular, with real PCF penumbrae. World surfaces are
+// fully PBR; characters keep a soft, slightly stylised falloff (wrap = cheap subsurface look on skin/cloth).
 const KIND = {
-  default: { termWidth: 0.07, termOffset: 0.0, tint: 0.35, rim: 0.25, rimWidth: 0.32, spec: 0.0, specSize: 0.97, trans: 0, sphere: 0, up: 0, bias: 0, lit: 1.0, amb: 1.0 },
-  ground:  { termWidth: 0.16, termOffset: -0.1, tint: 0.35, rim: 0.0, rimWidth: 0.3, spec: 0.0, specSize: 0.97, trans: 0, sphere: 0, up: 0.25, bias: 0.0, lit: 1.0, amb: 1.0 },
-  foliage: { termWidth: 0.22, termOffset: -0.12, tint: 0.40, rim: 0.35, rimWidth: 0.38, spec: 0.0, specSize: 0.97, trans: 0.55, sphere: 0.85, up: 0, bias: 0.35, lit: 1.0, amb: 1.05 },
-  grass:   { termWidth: 0.25, termOffset: -0.2, tint: 0.35, rim: 0.0, rimWidth: 0.3, spec: 0.0, specSize: 0.97, trans: 0.35, sphere: 0, up: 0.8, bias: 0.25, lit: 1.0, amb: 1.0 },
-  stone:   { termWidth: 0.06, termOffset: 0.0, tint: 0.38, rim: 0.18, rimWidth: 0.3, spec: 0.05, specSize: 0.96, trans: 0, sphere: 0, up: 0, bias: 0, lit: 1.0, amb: 1.0 },
-  roof:    { termWidth: 0.05, termOffset: 0.0, tint: 0.32, rim: 0.12, rimWidth: 0.28, spec: 0.12, specSize: 0.985, trans: 0, sphere: 0, up: 0, bias: 0, lit: 1.0, amb: 0.95 },
-  wood:    { termWidth: 0.06, termOffset: 0.0, tint: 0.35, rim: 0.15, rimWidth: 0.3, spec: 0.0, specSize: 0.97, trans: 0, sphere: 0, up: 0, bias: 0, lit: 1.0, amb: 1.0 },
-  plaster: { termWidth: 0.08, termOffset: 0.0, tint: 0.40, rim: 0.12, rimWidth: 0.3, spec: 0.0, specSize: 0.97, trans: 0, sphere: 0, up: 0, bias: 0, lit: 1.0, amb: 1.08 },
-  cloth:   { termWidth: 0.12, termOffset: -0.05, tint: 0.40, rim: 0.4, rimWidth: 0.4, spec: 0.0, specSize: 0.97, trans: 0.1, sphere: 0, up: 0, bias: 0.05, lit: 1.0, amb: 1.0 },
-  skin:    { termWidth: 0.05, termOffset: -0.05, tint: 0.45, rim: 0.3, rimWidth: 0.3, spec: 0.0, specSize: 0.97, trans: 0, sphere: 0, up: 0, bias: 0.02, lit: 1.0, amb: 1.05, warm: true },
-  hair:    { termWidth: 0.05, termOffset: 0.0, tint: 0.40, rim: 0.35, rimWidth: 0.3, spec: 0.45, specSize: 0.95, trans: 0, sphere: 0, up: 0, bias: 0.02, lit: 1.0, amb: 1.0 },
-  metal:   { termWidth: 0.04, termOffset: 0.05, tint: 0.30, rim: 0.35, rimWidth: 0.25, spec: 1.2, specSize: 0.975, trans: 0, sphere: 0, up: 0, bias: 0, lit: 0.85, amb: 0.8 },
-  water:   { termWidth: 0.2, termOffset: 0.0, tint: 0.2, rim: 0.5, rimWidth: 0.4, spec: 2.5, specSize: 0.993, trans: 0, sphere: 0, up: 0, bias: 0, lit: 0.6, amb: 0.9 },
-  glow:    { termWidth: 0.3, termOffset: 0.0, tint: 0.1, rim: 0.6, rimWidth: 0.5, spec: 0.0, specSize: 0.97, trans: 0, sphere: 0, up: 0, bias: 0, lit: 0.6, amb: 0.6 },
+  default: { termWidth: 0.07, termOffset: 0.0, tint: 0.35, rim: 0.06, rimWidth: 0.32, spec: 0.0, specSize: 0.97, trans: 0, sphere: 0, up: 0, bias: 0, lit: 1.0, amb: 1.0, pbr: 1.0, wrap: 0.08, rough: 0.8 },
+  ground:  { termWidth: 0.16, termOffset: -0.1, tint: 0.35, rim: 0.0, rimWidth: 0.3, spec: 0.0, specSize: 0.97, trans: 0, sphere: 0, up: 0.25, bias: 0.0, lit: 1.0, amb: 1.0, pbr: 1.0, wrap: 0.12, rough: 0.95 },
+  foliage: { termWidth: 0.22, termOffset: -0.12, tint: 0.40, rim: 0.2, rimWidth: 0.38, spec: 0.0, specSize: 0.97, trans: 0.55, sphere: 0.85, up: 0, bias: 0.35, lit: 1.0, amb: 1.05, pbr: 0.75, wrap: 0.45, rough: 0.62 },
+  grass:   { termWidth: 0.25, termOffset: -0.2, tint: 0.35, rim: 0.0, rimWidth: 0.3, spec: 0.0, specSize: 0.97, trans: 0.35, sphere: 0, up: 0.8, bias: 0.25, lit: 1.0, amb: 1.0, pbr: 0.75, wrap: 0.4, rough: 0.7 },
+  stone:   { termWidth: 0.06, termOffset: 0.0, tint: 0.38, rim: 0.0, rimWidth: 0.3, spec: 0.0, specSize: 0.96, trans: 0, sphere: 0, up: 0, bias: 0, lit: 1.0, amb: 1.0, pbr: 1.0, wrap: 0.06, rough: 0.82 },
+  roof:    { termWidth: 0.05, termOffset: 0.0, tint: 0.32, rim: 0.0, rimWidth: 0.28, spec: 0.0, specSize: 0.985, trans: 0, sphere: 0, up: 0, bias: 0, lit: 1.0, amb: 0.95, pbr: 1.0, wrap: 0.06, rough: 0.58 },
+  wood:    { termWidth: 0.06, termOffset: 0.0, tint: 0.35, rim: 0.0, rimWidth: 0.3, spec: 0.0, specSize: 0.97, trans: 0, sphere: 0, up: 0, bias: 0, lit: 1.0, amb: 1.0, pbr: 1.0, wrap: 0.06, rough: 0.72 },
+  plaster: { termWidth: 0.08, termOffset: 0.0, tint: 0.40, rim: 0.0, rimWidth: 0.3, spec: 0.0, specSize: 0.97, trans: 0, sphere: 0, up: 0, bias: 0, lit: 1.0, amb: 1.08, pbr: 1.0, wrap: 0.08, rough: 0.9 },
+  cloth:   { termWidth: 0.12, termOffset: -0.05, tint: 0.40, rim: 0.4, rimWidth: 0.4, spec: 0.0, specSize: 0.97, trans: 0.1, sphere: 0, up: 0, bias: 0.05, lit: 1.0, amb: 1.0, pbr: 0.7, wrap: 0.3, rough: 0.88 },
+  skin:    { termWidth: 0.05, termOffset: -0.05, tint: 0.45, rim: 0.3, rimWidth: 0.3, spec: 0.0, specSize: 0.97, trans: 0, sphere: 0, up: 0, bias: 0.02, lit: 1.0, amb: 1.05, warm: true, pbr: 0.65, wrap: 0.4, rough: 0.55 },
+  hair:    { termWidth: 0.05, termOffset: 0.0, tint: 0.40, rim: 0.35, rimWidth: 0.3, spec: 0.45, specSize: 0.95, trans: 0, sphere: 0, up: 0, bias: 0.02, lit: 1.0, amb: 1.0, pbr: 0.6, wrap: 0.3, rough: 0.5 },
+  metal:   { termWidth: 0.04, termOffset: 0.05, tint: 0.30, rim: 0.2, rimWidth: 0.25, spec: 1.2, specSize: 0.975, trans: 0, sphere: 0, up: 0, bias: 0, lit: 0.85, amb: 0.8, pbr: 1.0, wrap: 0.0, rough: 0.35 },
+  water:   { termWidth: 0.2, termOffset: 0.0, tint: 0.2, rim: 0.5, rimWidth: 0.4, spec: 2.5, specSize: 0.993, trans: 0, sphere: 0, up: 0, bias: 0, lit: 0.6, amb: 0.9, pbr: 1.0, wrap: 0.0, rough: 0.08 },
+  glow:    { termWidth: 0.3, termOffset: 0.0, tint: 0.1, rim: 0.6, rimWidth: 0.5, spec: 0.0, specSize: 0.97, trans: 0, sphere: 0, up: 0, bias: 0, lit: 0.6, amb: 0.6, pbr: 0.0, wrap: 0.0, rough: 1.0 },
 };
 
 // ─── registry / CSM / quality ────────────────────────────────────────────────────────────────────
@@ -153,6 +157,8 @@ uniform float uUpNormal;
 uniform float uShadowBias;
 uniform float uLitScale;
 uniform float uAmbScale;
+uniform float uPbr;
+uniform float uWrap;
 uniform vec3 uSkyZenith;
 uniform vec3 uSkyHorizon;
 
@@ -204,8 +210,9 @@ const FRAG_LIGHT = /* glsl */`
   #endif
   float tNdL = dot( tN, tL );
   float tRaw = toonShadow();
-  float tSh = smoothstep( 0.18, 0.82, tRaw );
+  float tSh = mix( smoothstep( 0.18, 0.82, tRaw ), tRaw, uPbr );
   float tLit = smoothstep( uTermOffset - uTermWidth, uTermOffset + uTermWidth, tNdL );
+  tLit = mix( tLit, saturate( ( tNdL + uWrap ) / ( 1.0 + uWrap ) ), uPbr );
   float tLight = tLit * tSh;
 
   vec3 tAmb = ambientLightColor;
@@ -216,10 +223,11 @@ const FRAG_LIGHT = /* glsl */`
 
   vec3 tAlb = diffuseColor.rgb;
   // shadow side: sky ambient, tinted toward blue-violet; lit side keeps a little ambient untinted
-  vec3 tTint = mix( uShadeTint, vec3( 1.0 ), tLight * 0.85 );
+  vec3 tTint = mix( uShadeTint, vec3( 1.0 ), max( tLight * 0.85, uPbr * 0.7 ) );
+  tAlb *= 1.0 - metalnessFactor;
   reflectedLight.indirectDiffuse += tAlb * tAmb * tTint * RECIPROCAL_PI;
-  // lit side: flat toon light with a whisper of lambert so big planes keep form
-  float tForm = mix( 0.82, 1.0, saturate( tNdL * 1.4 ) );
+  // lit side: flat toon light with a whisper of lambert so big planes keep form (PBR kinds: plain Lambert)
+  float tForm = mix( mix( 0.82, 1.0, saturate( tNdL * 1.4 ) ), 1.0, uPbr );
   reflectedLight.directDiffuse += tAlb * tSun * uLitScale * tLight * tForm * RECIPROCAL_PI;
 
   float tNdV = saturate( dot( tN, tV ) );
@@ -270,6 +278,29 @@ const FRAG_LIGHT = /* glsl */`
     float hs = smoothstep( uSpecSize - 0.006, uSpecSize + 0.004, tNdH );
     reflectedLight.directSpecular += tSun * hs * uSpec * tSh * RECIPROCAL_PI;
   }
+  #if defined( TOON_PBR_SPEC ) && ! defined( TOON_WATER )
+  {
+    // GGX sun highlight (Karis' mobile visibility approximation) + analytic sky IBL for the specular lobe
+    float tRough = clamp( roughnessFactor, 0.08, 1.0 );
+    float tA = tRough * tRough;
+    float tA2 = tA * tA;
+    float tDen = tNdH * tNdH * ( tA2 - 1.0 ) + 1.0;
+    float tD = tA2 / ( PI * tDen * tDen );
+    float tLdH = saturate( dot( tL, tH ) );
+    float tVis = 0.25 / ( max( 0.1, tLdH * tLdH ) * ( tRough + 0.5 ) );
+    vec3 tF0 = mix( vec3( 0.04 ), diffuseColor.rgb, metalnessFactor );
+    vec3 tF = tF0 + ( 1.0 - tF0 ) * pow( 1.0 - tLdH, 5.0 );
+    reflectedLight.directSpecular += tSun * tF * ( min( tD * tVis, 8.0 ) * saturate( tNdL ) * tSh * uPbr );
+    vec3 tR = reflect( -tV, tN );
+    float ry = ( vec4( tR, 0.0 ) * viewMatrix ).y;
+    vec3 tEnv = mix( uSkyHorizon, uSkyZenith, smoothstep( 0.0, 0.75, ry ) );
+    tEnv = mix( tAmb * 0.32, tEnv, smoothstep( -0.2 - tRough * 0.5, 0.1 + tRough * 0.5, ry ) );
+    tEnv = mix( tEnv, tAmb * 0.6, tRough * tRough );
+    vec3 tFe = tF0 + ( max( vec3( 1.0 - tRough ), tF0 ) - tF0 ) * pow( 1.0 - tNdV, 5.0 );
+    // horizon / self-shadow occlusion: surfaces in sun shadow reflect less open sky
+    reflectedLight.indirectSpecular += tEnv * tFe * ( uPbr * mix( 0.45, 1.0, tSh ) );
+  }
+  #endif
   #endif
 
   #ifdef TOON_WATER
@@ -289,6 +320,7 @@ function toKindDefines(kind) {
   d['TOON_' + kind.toUpperCase()] = '';
   if (kind === 'foliage' || kind === 'grass' || kind === 'cloth') d.TOON_TRANSLUCENT = '';
   if (kind === 'foliage') d.TOON_SPHERE_NORMAL = '';
+  if (!quality || quality.pbrSpecular !== false) d.TOON_PBR_SPEC = '';
   return d;
 }
 
@@ -298,7 +330,8 @@ export function createToonMaterial(opts = {}) {
   const P = KIND[kind];
   const params = {
     color: opts.color ?? 0xffffff,
-    roughness: 1, metalness: 0,
+    roughness: opts.roughness ?? P.rough, metalness: opts.metalness ?? 0,
+    roughnessMap: opts.roughnessMap ?? null,
     map: opts.map ?? null,
     normalMap: opts.normalMap ?? null,
     alphaMap: opts.alphaMap ?? null,
@@ -352,6 +385,8 @@ export function createToonMaterial(opts = {}) {
     uShadowBias: { value: opts.shadowBias ?? P.bias },
     uLitScale: { value: opts.litScale ?? P.lit },
     uAmbScale: { value: opts.ambScale ?? P.amb },
+    uPbr: { value: opts.pbr ?? P.pbr },
+    uWrap: { value: opts.wrap ?? P.wrap },
     ...(opts.uniforms || {}),
   };
   m.userData.toonUniforms = U;
@@ -365,7 +400,7 @@ export function createToonMaterial(opts = {}) {
   if (/\buTime\b/.test(hooks.vh) && !declares(hooks.vp)) hooks.vp = 'uniform float uTime;\n' + hooks.vp;
   if (/\buTime\b/.test(hooks.fh + hooks.fhp) && !declares(hooks.fp)) hooks.fp = 'uniform float uTime;\n' + hooks.fp;
   const userOBC = opts.onBeforeCompile;
-  const key = 'toon2|' + kind + '|' + (opts.cacheKey ?? (hooks.vp + hooks.vh + hooks.fp + hooks.fh + hooks.fhp + (userOBC ? userOBC.toString() : '')));
+  const key = 'toon3|' + (quality && quality.pbrSpecular === false ? 'lq|' : '') + kind + '|' + (opts.cacheKey ?? (hooks.vp + hooks.vh + hooks.fp + hooks.fh + hooks.fhp + (userOBC ? userOBC.toString() : '')));
 
   const patch = (shader, renderer) => {
     Object.assign(shader.uniforms, U);
