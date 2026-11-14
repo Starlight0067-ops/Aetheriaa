@@ -38,6 +38,7 @@ export function createControls(ctx) {
     const k = (c) => input.down(c);
     const jp = (c) => input.justPressed(c);
     if (!api.enabled || ctx.shot) {
+      ctx.touch?.consume?.();
       Object.assign(s, { moveX: 0, moveY: 0, moveMag: 0, lookX: 0, lookY: 0, padLookX: 0, padLookY: 0, zoom: 0,
         jumpPressed: false, jumpHeld: false, dodgePressed: false, dodgeHeld: false, sprintHeld: false, recenterPressed: false });
       s.cameraIdle += dt;
@@ -84,8 +85,18 @@ export function createControls(ctx) {
     }
     if (kbAny) s.gamepad = false;
 
+    // touch overlay (src/input/touch.js): analog stick, drag-look, pinch zoom
+    const tc = ctx.touch;
+    let tlx = 0, tly = 0;
+    if (tc?.enabled) {
+      const o = tc.consume();
+      tlx = o.lookX; tly = o.lookY; zoom += o.zoom;
+      if (tc.mag > 0) { mx = tc.moveX; my = tc.moveY; mag = tc.mag; s.gamepad = true; if (tc.sprint) sprintHeld = true; }
+      else if (tc.active) s.gamepad = true;
+    }
+
     s.moveX = mx; s.moveY = my; s.moveMag = clamp(mag, 0, 1);
-    s.lookX = input.mouse.dx; s.lookY = input.mouse.dy;
+    s.lookX = input.mouse.dx + tlx; s.lookY = input.mouse.dy + tly;
     s.padLookX = plx; s.padLookY = ply;
     s.zoom = zoom;
     s.jumpPressed = jumpPressed; s.jumpHeld = jumpHeld;

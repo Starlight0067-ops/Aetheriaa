@@ -2,13 +2,20 @@
 <html lang="es">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
+  <meta name="theme-color" content="#0b1020" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="format-detection" content="telephone=no" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230b1020'/%3E%3Cpath d='M16 4 27 16 16 28 5 16Z' fill='none' stroke='%237ff5ff' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='3.2' fill='%23e9fdff'/%3E%3C/svg%3E" />
   <title>AETHERIA</title>
   <style>
-    html, body { margin: 0; height: 100%; background: #0b1020; overflow: hidden; }
+    html, body { margin: 0; height: 100%; background: #0b1020; overflow: hidden; overscroll-behavior: none; }
+    body { position: fixed; inset: 0; width: 100%; -webkit-text-size-adjust: 100%; }
+    body.touch-ui { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: none; }
     #app { position: fixed; inset: 0; }
-    #app canvas { display: block; width: 100%; height: 100%; }
+    #app canvas { display: block; width: 100%; height: 100%; touch-action: none; outline: none; }
     #ui { position: fixed; inset: 0; pointer-events: none; font-family: "Segoe UI", system-ui, sans-serif; color: #f4eedc; }
     #loading { position: fixed; inset: 0; display: grid; place-items: center; background: #0b1020; color: #e9fdff;
       font: 600 28px Georgia, serif; letter-spacing: 0.3em; transition: opacity .6s; z-index: 10; }

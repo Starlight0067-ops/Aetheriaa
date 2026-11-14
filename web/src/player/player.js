@@ -8,6 +8,7 @@ import { PlayerController } from './controller.js';
 import { CameraRig } from './camera.js';
 import { createVisualHost } from './visual.js';
 import { createStaminaHud } from './hud.js';
+import { createTouch } from '../input/touch.js';
 
 /** Horizontal clearance (m, capped at maxD) around a point, from 16 rays. */
 function clearance(physics, x, y, z, maxD = 6) {
@@ -76,6 +77,7 @@ export async function create(ctx) {
   const visual = createVisualHost(ctx, root, 'kael');
   ctx.pending.push(visual.ready);
 
+  ctx.touch = ctx.touch || createTouch(ctx);
   const controls = createControls(ctx);
   let cameraRig = null;
   const controller = new PlayerController(ctx, physics, root, visual, controls, () => (cameraRig ? cameraRig.moveYaw : 0));

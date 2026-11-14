@@ -103,3 +103,17 @@ Static town geometry is merged into one `BatchedMesh` per material (see
 - `npm run build` passes (91 modules).
 - Known gaps: `street` view composition is rough; ~25 fps at 1280×720 `medium` on Intel UHD;
   one harmless 404 in console (likely `/favicon.ico`).
+
+
+## Mobile controls
+
+Touch overlay (`src/input/touch.js`) appears on coarse-pointer devices; force it with `?touch=1`, disable with `?touch=0`.
+Desktop keyboard + mouse and gamepad are unchanged.
+
+- Left half: floating analog joystick (dead zone, smooth curve; walk below ~60%, run above, sprint at the rim).
+- Right half: drag to orbit the camera, two-finger pinch to zoom. Sensitivity and UI scale are in the menu panel (saved in localStorage).
+- Right-hand buttons: Attack, Jump, Dodge, Elemental skill, Interact, Heal, Lock-on, element selector (1-6, tap the number to expand).
+- Top-right: Pause and a menu panel (inventory, journal, map, character, UI scale, camera sensitivity, fullscreen + landscape lock).
+- Buttons feed the same inputs as desktop (Space, E, F, Tab, H, 1-6, I/J/M/C/Esc, LMB attack, RMB dodge) and also emit
+  `aetheria:action` window events. Inputs are tracked per `pointerId` and released on cancel, blur, hidden tab and rotation.
+- Portrait works; a hint suggests landscape. iOS Safari has no Fullscreen API for pages (use Add to Home Screen).
