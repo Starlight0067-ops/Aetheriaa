@@ -258,6 +258,10 @@ const FRAG_LIGHT = /* glsl */`
     float back = pow( saturate( dot( tV, -tL ) ), 3.0 );
     float thin = 0.35 + 0.65 * ( 1.0 - tLit );
     reflectedLight.directDiffuse += tAlb * tSun * vec3( 1.05, 1.1, 0.7 ) * ( back * thin * uTrans * mix( 0.25, 1.0, tSh ) ) * RECIPROCAL_PI;
+    // transmission: sunlight leaking through thin leaves / blades / cloth that face away from the sun
+    // (view independent), so the shadow side of a canopy keeps a warm green glow instead of going flat
+    float thru = saturate( 0.15 - tNdL ) * mix( 0.12, 1.0, tSh );
+    reflectedLight.directDiffuse += tAlb * tSun * vec3( 0.9, 1.0, 0.5 ) * ( thru * uTrans * 0.45 ) * RECIPROCAL_PI;
   }
   #endif
 
@@ -430,7 +434,7 @@ export function createToonMaterial(opts = {}) {
   if (/\buTime\b/.test(hooks.vh) && !declares(hooks.vp)) hooks.vp = 'uniform float uTime;\n' + hooks.vp;
   if (/\buTime\b/.test(hooks.fh + hooks.fhp) && !declares(hooks.fp)) hooks.fp = 'uniform float uTime;\n' + hooks.fp;
   const userOBC = opts.onBeforeCompile;
-  const key = 'toon3|' + (quality && quality.pbrSpecular === false ? 'lq|' : '') + kind + '|' + (opts.cacheKey ?? (hooks.vp + hooks.vh + hooks.fp + hooks.fh + hooks.fhp + (userOBC ? userOBC.toString() : '')));
+  const key = 'toon4|' + (quality && quality.pbrSpecular === false ? 'lq|' : '') + kind + '|' + (opts.cacheKey ?? (hooks.vp + hooks.vh + hooks.fp + hooks.fh + hooks.fhp + (userOBC ? userOBC.toString() : '')));
 
   const patch = (shader, renderer) => {
     Object.assign(shader.uniforms, U);

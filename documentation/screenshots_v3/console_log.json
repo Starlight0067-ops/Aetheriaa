@@ -1,0 +1,47 @@
+[
+  {
+    "view": "plaza",
+    "file": "/home/user/Aetheriaa/documentation/screenshots_v3/plaza.png",
+    "errors": [
+      "[warning] [.WebGL-0x27740016ce00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+      "[warning] [.WebGL-0x27740016ce00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+      "[warning] [.WebGL-0x27740016ce00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+      "[warning] [.WebGL-0x27740016ce00]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)"
+    ]
+  },
+  {
+    "view": "street",
+    "file": "/home/user/Aetheriaa/documentation/screenshots_v3/street.png",
+    "errors": []
+  },
+  {
+    "view": "bridge",
+    "file": "/home/user/Aetheriaa/documentation/screenshots_v3/bridge.png",
+    "errors": []
+  },
+  {
+    "view": "overview",
+    "file": "/home/user/Aetheriaa/documentation/screenshots_v3/overview.png",
+    "errors": []
+  },
+  {
+    "view": "meadow",
+    "file": "/home/user/Aetheriaa/documentation/screenshots_v3/meadow.png",
+    "errors": []
+  },
+  {
+    "view": "portrait",
+    "file": "/home/user/Aetheriaa/documentation/screenshots_v3/portrait.png",
+    "errors": []
+  },
+  {
+    "view": "fullbody",
+    "file": "/home/user/Aetheriaa/documentation/screenshots_v3/fullbody.png",
+    "errors": []
+  },
+  {
+    "view": "hall",
+    "file": "/home/user/Aetheriaa/documentation/screenshots_v3/hall.png",
+    "errors": []
+  }
+]

@@ -315,6 +315,7 @@ export async function create(ctx) {
         attribute vec4 aCard; attribute vec4 aCell;
         uniform float uR; uniform float uTime;
         varying vec2 vUv; varying vec2 vLocal; varying vec3 vRight; varying vec3 vUp; varying vec3 vFwd; varying float vDirY; varying float vBright;
+        varying vec2 vLu; varying vec2 vCellO;
         void main() {
           float az = aCard.x + uTime * 0.0016;
           float el = aCard.y;
@@ -325,6 +326,7 @@ export async function create(ctx) {
           vLocal = position.xy * 0.5 + 0.5;
           float u = aCell.z > 0.0 ? vLocal.x : 1.0 - vLocal.x;
           vUv = vec2( ( aCell.x + u ) * 0.5, ( aCell.y + 1.0 - vLocal.y ) * 0.25 );
+          vLu = vec2( u, 1.0 - vLocal.y ); vCellO = aCell.xy;
           vRight = right * sign( aCell.z ); vUp = up; vFwd = -dir;
           vDirY = normalize( p ).y; vBright = aCell.w;
           vec4 cp = projectionMatrix * viewMatrix * vec4( cameraPosition + p * uR, 1.0 );
@@ -335,6 +337,7 @@ export async function create(ctx) {
         ${SKY_GLSL}
         uniform sampler2D uAtlas; uniform vec3 uFog;
         varying vec2 vUv; varying vec2 vLocal; varying vec3 vRight; varying vec3 vUp; varying vec3 vFwd; varying float vDirY; varying float vBright;
+        varying vec2 vLu; varying vec2 vCellO;
         void main() {
           vec4 t = texture2D( uAtlas, vUv );
           float a = smoothstep( 0.3, 0.7, t.a );
@@ -346,6 +349,23 @@ export async function create(ctx) {
           float hgt = ( vLocal.y - 0.18 ) / 0.82;
           float under = smoothstep( 0.0, 0.42, hgt + n.y * 0.18 );
           lit *= mix( 0.35, 1.0, under );
+          #if CLOUD_STEPS > 0
+          {
+            // cheap volumetric self-shadowing: march the lobe density toward the sun inside the cloud's atlas
+            // cell (Beer-Lambert), so towers shade the lobes behind them and thin edges stay bright (powder)
+            vec2 sd2 = Ls.xy / max( length( Ls.xy ), 1e-3 ) * vec2( 0.5, -1.0 ) * ( 0.26 / float( CLOUD_STEPS ) );
+            float dens = 0.0;
+            for ( int i = 1; i <= CLOUD_STEPS; i ++ ) {
+              vec2 q = vLu + sd2 * float( i );
+              vec2 inb = step( vec2( 0.0 ), q ) * step( q, vec2( 1.0 ) );
+              vec4 sm = texture2D( uAtlas, ( vCellO + clamp( q, 0.002, 0.998 ) ) * vec2( 0.5, 0.25 ) );
+              dens += smoothstep( 0.3, 0.7, sm.a ) * ( 0.35 + 0.65 * sm.b ) * inb.x * inb.y;
+            }
+            float through = exp( -dens * ( 3.2 / float( CLOUD_STEPS ) ) * ( 1.0 - 0.55 * max( Ls.z, 0.0 ) ) );
+            float thin = 1.0 - smoothstep( 0.35, 0.95, t.a );
+            lit *= mix( 0.42, 1.0, max( through, thin ) );
+          }
+          #endif
           vec3 shadeCol = vec3( 0.50, 0.60, 0.88 );
           vec3 midCol = vec3( 0.78, 0.84, 0.98 );
           vec3 litCol = vec3( 1.04, 1.0, 0.95 );
@@ -367,6 +387,7 @@ export async function create(ctx) {
           a *= smoothstep( -0.015, 0.02, vDirY );
           gl_FragColor = vec4( col, a );
         }`,
+      defines: { CLOUD_STEPS: Math.max(0, quality.cloudSteps | 0) },
       depthTest: false, depthWrite: false, fog: false, transparent: false,
       blending: THREE.CustomBlending, blendSrc: THREE.SrcAlphaFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
       blendSrcAlpha: THREE.OneFactor, blendDstAlpha: THREE.OneMinusSrcAlphaFactor,
