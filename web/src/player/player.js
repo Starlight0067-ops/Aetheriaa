@@ -114,6 +114,7 @@ export async function create(ctx) {
     physics.update(dt);
     if (stats.colliders !== lastColliderCount) { lastColliderCount = stats.colliders; controller.unstick(); }  // streamed-in colliders on top of us
     controls.update(dt);
+    ctx.hooks?.preControl?.(dt);           // gameplay layer (combat / lock-on) adjusts intents before movement
     controller.update(dt);
     cameraRig.update(dt);
     const phys = performance.now() - t0;

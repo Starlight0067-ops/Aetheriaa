@@ -153,3 +153,41 @@ Desktop keyboard + mouse and gamepad are unchanged.
 - Buttons feed the same inputs as desktop (Space, E, F, Tab, H, 1-6, I/J/M/C/Esc, LMB attack, RMB dodge) and also emit
   `aetheria:action` window events. Inputs are tracked per `pointerId` and released on cancel, blur, hidden tab and rotation.
 - Portrait works; a hint suggests landscape. iOS Safari has no Fullscreen API for pages (use Add to Home Screen).
+
+## Gameplay systems (src/game, src/ui)
+
+Ported compactly from the Godot version (`data/*.json`, `scripts/{player,combat,elements,ai,quests,inventory,ui}`);
+data lives in `src/game/data.js`. The layer boots from `src/game/index.js` (called by `main.js` after the player) and
+talks to the player only through `ctx.hooks.preControl` (called in `player.js` between controls and the controller).
+`ctx.paused` freezes the simulation (menus, dialogue); `ctx.uiUpdaters` always run; `ctx.timeScale` drives hit-stop.
+
+| Input | Action |
+| --- | --- |
+| WASD / Shift / Space | move / sprint / jump |
+| LMB | attack, 3-hit combo (arc hitbox, hit-stop, damage numbers) |
+| RMB or Ctrl | dodge (i-frames, stamina cost) |
+| E | elemental skill of the selected element (cooldown + energy) |
+| 1-6 | Pyra, Aqua, Terra, Volt, Zephyr, Crya (click the bottom bar too) |
+| H | heal (3 charges, regenerate; falls back to Healing Tonics) |
+| Tab / Q | lock-on nearest on-screen enemy / switch target |
+| F | interact: talk, open chests, gather Sunpetals |
+| I / J / M / C / Esc | inventory, journal, map, character, pause (settings: quality, sensitivity, volume, save, reset) |
+| Gamepad | X/RT attack, Y interact, LT skill, LB lock, Back heal, D-pad left/right element, Start pause |
+
+- **Elements and reactions**: every hit leaves an element aura; a second element within 8 s triggers the reaction table of
+  `elements.json` (Frozen, Steam Burst, Conduction, Wildfire, Crystallize, Melt, Overload, Fracture, Squall, Blizzard,
+  Magma, Mire). Skills apply statuses (burn, stun, slow). All six elements are unlocked from the start (the Godot game unlocks them through quests).
+- **Enemies**: Bramble Wisp and Rootling Brute (geometry + `AnimationMixer` keyframe clips), AI states idle / patrol / chase /
+  telegraphed windup / strike / stunned / return / dead, spawns on the east road and the west meadows, drops, XP and levels.
+- **Quests**: *Echoes in the Whisperwood* (Lyra, plaza, Maren) chains into *The First Verse* (3 wisps, Choir Steps, report to Maren);
+  *Petals for a Price* (Toma, Sunpetals). Objective marker in the world and on the minimap.
+- **Save**: `localStorage` key `aetheria.web.save.v1` (progress, inventory, quests, settings; every 15 s and on quit).
+- **Audio**: SFX synthesised with WebAudio, started on the first gesture.
+- **Touch**: HUD moves out of the way of the touch overlay; the overlay is hidden during dialogue and menus.
+
+### Tests
+
+`?test=1` stops the automatic loop: advance with `__game.step(n, dt)`; `window.__game` exposes `snapshot()`, `spawnNear()`,
+`cast(el)`, `teleport()`, `tap(code)`, `talk(id)`, `killAll()` etc. (`?nosave=1` ignores the save). Playwright suite
+(dev server on :5173): `node tools/gameplay-test.cjs [desktop|mobile|all]`; screenshots go to
+`documentation/screenshots_gameplay/`.

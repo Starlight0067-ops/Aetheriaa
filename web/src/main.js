@@ -11,6 +11,7 @@ import * as sky from './render/sky.js';
 import * as pipeline from './render/pipeline.js';
 import * as world from './world/index.js';
 import * as player from './player/player.js';
+import * as game from './game/index.js';
 
 const params = new URLSearchParams(location.search);
 const shot = params.has('view');
@@ -37,6 +38,10 @@ const ctx = {
   colliders: [],     // static collider descriptors pushed by world modules (consumed by player/physics)
   pending: [],       // promises that must settle before the frame counts as "ready" for screenshots
   systems: {},
+  uiUpdaters: [],    // (rawDt) => void, run every frame even while paused (UI, hit-stop timer)
+  hooks: {},         // gameplay hooks called from player.js (preControl)
+  paused: false, timeScale: 1,
+  testMode: params.has('test'),   // ?test=1: simulation only advances through window.__game.step()
   cameraLocked: false,
   time: 0,
 };
@@ -78,6 +83,7 @@ async function boot() {
   ctx.systems.world = await world.create(ctx);
   ctx.systems.player = await player.create(ctx);
   ctx.systems.pipeline = await pipeline.create(ctx);
+  try { ctx.systems.game = await game.create(ctx); } catch (e) { console.error('[game] failed', e); }
   applyView();
   const loading = document.getElementById('loading');
   loading.style.opacity = '0';
@@ -85,15 +91,20 @@ async function boot() {
   await Promise.allSettled(ctx.pending);
   let frames = 0;
   timer.update();
+  ctx.tick = (raw) => {
+    const dt = raw * ctx.timeScale;
+    ctx.rawDt = raw;
+    ctx.time += dt;
+    if (!ctx.paused) for (const u of ctx.updaters) u(dt, ctx.time);
+    for (const u of ctx.uiUpdaters) u(raw);
+    ctx.viewUpdate?.();
+  };
   renderer.setAnimationLoop(() => {
     timer.update();
-    const dt = Math.min(timer.getDelta(), 1 / 20);
-    ctx.time += dt;
-    for (const u of ctx.updaters) u(dt, ctx.time);
-    ctx.viewUpdate?.();
-    ctx.systems.pipeline.render(dt);
-    ctx.input.endFrame();
-    fpsAvg = fpsAvg * 0.95 + (1 / Math.max(dt, 1e-4)) * 0.05;
+    const raw = Math.min(timer.getDelta(), 1 / 20);
+    if (!ctx.testMode) { ctx.tick(raw); ctx.input.endFrame(); }
+    if (!ctx.testMode || ctx.renderOnce) { ctx.renderOnce = false; ctx.systems.pipeline.render(raw); }   // ?test=1 renders only on demand (__game.render())
+    fpsAvg = fpsAvg * 0.95 + (1 / Math.max(raw, 1e-4)) * 0.05;
     window.__AETHERIA_FPS = fpsAvg;
     if (++frames === 90) window.__AETHERIA_READY = true;
   });

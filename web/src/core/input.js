@@ -22,6 +22,8 @@ export function createInput(dom, { shot = false } = {}) {
     down: (code) => keys.has(code),
     justPressed: (code) => pressed.has(code),
     clicked: (b) => mouse.clicked.has(b),
+    /** Swallow a key press so gameplay does not also see it this frame (UI handled it). */
+    consume: (code) => pressed.delete(code),
     gamepad: () => (navigator.getGamepads?.() || []).find((g) => g) || null,
     /** Call once per frame after all systems read input. */
     endFrame() { pressed.clear(); mouse.clicked.clear(); mouse.dx = mouse.dy = mouse.wheel = 0; },
