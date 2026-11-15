@@ -87,6 +87,20 @@ const foreign = new WeakSet();
 let csm = null;
 let quality = null;
 let ctxRef = null;
+let envMap = null, envIntensity = 1;
+
+/** Called by environment.js once the HDRI is prefiltered: every toon material (past and future) samples the
+ *  PMREM for diffuse irradiance and specular radiance instead of the analytic sky gradient. */
+export function setEnvironment(texture, intensity = 1) {
+  envMap = texture; envIntensity = intensity;
+  for (const m of registry) applyEnv(m);
+}
+function applyEnv(m) {
+  if (!envMap || m.userData.kind === 'glow' || m.envMap === envMap) return;
+  m.envMap = envMap;
+  m.envMapIntensity = envIntensity;
+  m.needsUpdate = true;
+}
 
 /** Called by lighting.js once. */
 export function initToon(ctx) {
@@ -221,6 +235,10 @@ const FRAG_LIGHT = /* glsl */`
   tAmb += getHemisphereLightIrradiance( hemisphereLights[ 0 ], tN );
   #endif
   tAmb *= uAmbScale;
+  #ifdef USE_ENVMAP
+  // HDRI irradiance (calibrated to the hemisphere light's level): directional, cloud-tinted sky fill
+  tAmb = mix( tAmb, getIBLIrradiance( tN ) * uAmbScale, 0.85 );
+  #endif
 
   vec3 tAlb = diffuseColor.rgb;
   // shadow side: sky ambient, tinted toward blue-violet; lit side keeps a little ambient untinted
@@ -268,11 +286,15 @@ const FRAG_LIGHT = /* glsl */`
     reflectedLight.directSpecular += tSun * mix( tAlb, vec3( 1.0 ), 0.35 ) * hs * uSpec * tSh * RECIPROCAL_PI * 3.0;
     vec3 tR = reflect( -tV, tN );
     float ry = ( vec4( tR, 0.0 ) * viewMatrix ).y;
+    #ifdef USE_ENVMAP
+    reflectedLight.indirectSpecular += getIBLRadiance( tV, tN, clamp( roughnessFactor, 0.12, 1.0 ) ) * tAlb * 1.1;
+    #else
     vec3 env = mix( uSkyHorizon * 0.55, uSkyZenith, smoothstep( -0.1, 0.7, ry ) );
     env = mix( vec3( 0.32, 0.27, 0.24 ) * 0.4, env, smoothstep( -0.25, 0.05, ry ) );
     reflectedLight.indirectSpecular += env * tAlb * 0.9;
     float band = smoothstep( 0.0, 0.08, ry ) - smoothstep( 0.08, 0.2, ry );
     reflectedLight.indirectSpecular += uSkyHorizon * tAlb * band * 0.5;
+    #endif
   }
   #else
   if ( uSpec > 0.0 ) {
@@ -294,9 +316,13 @@ const FRAG_LIGHT = /* glsl */`
     reflectedLight.directSpecular += tSun * tF * ( min( tD * tVis, 8.0 ) * saturate( tNdL ) * tSh * uPbr );
     vec3 tR = reflect( -tV, tN );
     float ry = ( vec4( tR, 0.0 ) * viewMatrix ).y;
+    #ifdef USE_ENVMAP
+    vec3 tEnv = getIBLRadiance( tV, tN, tRough );
+    #else
     vec3 tEnv = mix( uSkyHorizon, uSkyZenith, smoothstep( 0.0, 0.75, ry ) );
     tEnv = mix( tAmb * 0.32, tEnv, smoothstep( -0.2 - tRough * 0.5, 0.1 + tRough * 0.5, ry ) );
     tEnv = mix( tEnv, tAmb * 0.6, tRough * tRough );
+    #endif
     vec3 tFe = tF0 + ( max( vec3( 1.0 - tRough ), tF0 ) - tF0 ) * pow( 1.0 - tNdV, 5.0 );
     // horizon / self-shadow occlusion: surfaces in sun shadow reflect less open sky
     reflectedLight.indirectSpecular += tEnv * tFe * ( uPbr * mix( 0.45, 1.0, tSh ) );
@@ -309,6 +335,9 @@ const FRAG_LIGHT = /* glsl */`
     vec3 tR = reflect( -tV, tN );
     float ry = ( vec4( tR, 0.0 ) * viewMatrix ).y;
     vec3 env = mix( uSkyHorizon, uSkyZenith, smoothstep( 0.0, 0.6, ry ) );
+    #ifdef USE_ENVMAP
+    env = getIBLRadiance( tV, tN, 0.1 );
+    #endif
     float f = 0.04 + 0.96 * pow( 1.0 - tNdV, 5.0 );
     reflectedLight.indirectSpecular += env * f * 1.2;
   }
@@ -429,6 +458,7 @@ export function createToonMaterial(opts = {}) {
   m.customProgramCacheKey = () => key;
   registry.add(m);
   if (csm) applyCSM(m);
+  applyEnv(m);
   m.addEventListener('dispose', () => registry.delete(m));
   return m;
 }

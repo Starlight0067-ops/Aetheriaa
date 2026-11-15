@@ -22,6 +22,7 @@ Per-file sources are listed in `web/public/assets/cc0/LICENSES.md`.
 | Asset | Used for | Origin | License |
 |---|---|---|---|
 | `web/public/assets/cc0/ground/*` (dirt_floor, aerial_grass_rock, cobblestone_floor_08; diffuse / normal / roughness, 1k) | Terrain grass detail, dirt paths, street and plaza cobblestone | Poly Haven (polyhaven.com), authors eye-candy.xyz and Rob Tuytel | CC0 1.0 |
+| `web/public/assets/cc0/hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr` | Image-based lighting (diffuse irradiance + specular reflections) on the `high` / `ultra` presets | Poly Haven (polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky), authors Greg Zaal and Jarod Guest | CC0 1.0 |
 | `web/public/assets/cc0/characters/adventurer, hooded_adventurer, rogue, worker (.glb)` | Player (adventurer), elder (hooded adventurer), blacksmith (worker), envoy (rogue) | Quaternius (quaternius.com), via npm `@netforge/asset-library-files` | CC0 1.0 |
 | `web/public/assets/cc0/characters/mini_male_a, mini_female_a (.glb)` | Townsfolk NPCs | Kenney (kenney.nl), via npm `@netforge/asset-library-files` | CC0 1.0 |
 | `web/public/assets/cc0/buildings/*.glb` | Optional block buildings (`?buildings=blocks`) and spare props | Quaternius / Kenney, via npm `@netforge/asset-library-files` | CC0 1.0 |

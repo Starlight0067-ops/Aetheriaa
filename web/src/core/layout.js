@@ -35,7 +35,7 @@ export const VIEWS = {
   plaza:    { pos: [15, 27.5, 31], target: [0, 23.5, -2], fov: 55 },
   street:   { pos: [-56, 18.8, 3.2], target: [4, 23, 1], fov: 58 },
   bridge:   { pos: [-170, 40, 55], target: [-100, 15, 3], fov: 50 },
-  hall:     { pos: [1, 27, -8], target: [52, 49, -54], fov: 55 },
+  hall:     { pos: [5, 26.4, -13], target: [52, 49, -54], fov: 55 },   // outside the plaza bunting ring
   meadow:   { pos: [-128, 23, 44], target: [-200, 33, 0], fov: 55 },
   portrait: { follow: 'player', offset: [0, 1.6, 1.0], look: [0, 1.57, 0], fov: 32 },
   fullbody: { follow: 'player', offset: [0, 1.05, 3.3], look: [0, 0.92, 0], fov: 40 },

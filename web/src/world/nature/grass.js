@@ -146,6 +146,7 @@ class ScatterLayer {
     geometry.instanceCount = 0;
     this.mesh = new THREE.Mesh(geometry, material);
     this.mesh.frustumCulled = false;
+    this.mesh.name = this.mesh.name || "grass_patch";
     this.mesh.castShadow = false;
     this.mesh.receiveShadow = true;
     ctx.scene.add(this.mesh);

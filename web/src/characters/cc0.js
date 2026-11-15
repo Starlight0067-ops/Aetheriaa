@@ -42,6 +42,40 @@ const ALIAS = { sprint: 'run', attack1: 'attack', attack2: 'attack', attack3: 'a
 const KIND_RULES = [[/skin/i, 'skin'], [/hair|brow|beard/i, 'hair'], [/metal|gold/i, 'metal'], [/.*/, 'cloth']];
 const kindOf = (n) => KIND_RULES.find(([re]) => re.test(n))[1];
 
+/** Crease-angle smoothing. The CC0 low-poly rigs ship faceted normals (every face split), which the soft
+ *  wrapped lighting turns into hard value bands on hair, shoulders and rolled cloth. Vertices sharing a
+ *  position get the average of the face normals within `creaseDeg` of their own, so rounded forms shade
+ *  smoothly while real edges (collars, belts, blade edges) stay crisp. Runs once per shared geometry. */
+function smoothNormals(geometry, creaseDeg = 62) {
+  if (geometry.userData.aeSmoothed) return;
+  geometry.userData.aeSmoothed = true;
+  const pos = geometry.attributes.position, nor = geometry.attributes.normal;
+  if (!pos || !nor || pos.count > 150000) return;
+  const cosT = Math.cos(creaseDeg * Math.PI / 180);
+  const groups = new Map();
+  const q = (v) => Math.round(v * 2000);
+  for (let i = 0; i < pos.count; i++) {
+    const k = q(pos.getX(i)) + ',' + q(pos.getY(i)) + ',' + q(pos.getZ(i));
+    const g = groups.get(k);
+    if (g) g.push(i); else groups.set(k, [i]);
+  }
+  const src = Float32Array.from({ length: pos.count * 3 }, (_, j) => (j % 3 === 0 ? nor.getX((j / 3) | 0) : j % 3 === 1 ? nor.getY((j / 3) | 0) : nor.getZ((j / 3) | 0)));
+  for (const g of groups.values()) {
+    if (g.length < 2) continue;
+    for (const i of g) {
+      const ax = src[i * 3], ay = src[i * 3 + 1], az = src[i * 3 + 2];
+      let x = 0, y = 0, z = 0;
+      for (const j of g) {
+        const bx = src[j * 3], by = src[j * 3 + 1], bz = src[j * 3 + 2];
+        if (ax * bx + ay * by + az * bz >= cosT) { x += bx; y += by; z += bz; }
+      }
+      const l = Math.hypot(x, y, z);
+      if (l > 1e-6) nor.setXYZ(i, x / l, y / l, z / l);
+    }
+  }
+  nor.needsUpdate = true;
+}
+
 export async function createCC0Character(ctx, id, opts = {}) {
   const spec = CC0_CAST[id];
   if (!spec) return null;
@@ -57,7 +91,9 @@ export async function createCC0Character(ctx, id, opts = {}) {
       if (src.map) src.map.colorSpace = THREE.SRGBColorSpace;
       const recolor = spec.colors?.find(([re]) => re.test(src.name || ''));
       const color = recolor ? new THREE.Color(recolor[1]) : (src.color ? src.color.clone() : new THREE.Color(0xffffff));
-      m = createToonMaterial({ color, map: src.map || null, kind, side: src.side });
+      // hair: no hard anime highlight band — on these low-poly scalps it reads as white stripes, the soft
+      // GGX lobe (medium+) is enough
+      m = createToonMaterial({ color, map: src.map || null, kind, side: src.side, ...(kind === 'hair' ? { spec: 0, roughness: 0.62 } : {}) });
       m.name = src.name;
       matCache.set(src, m);
     }
@@ -66,6 +102,7 @@ export async function createCC0Character(ctx, id, opts = {}) {
   scene.traverse((o) => {
     if (!o.isMesh) return;
     o.frustumCulled = false;
+    if (o.geometry) smoothNormals(o.geometry);
     o.material = Array.isArray(o.material) ? o.material.map(toToon) : toToon(o.material);
     if (opts.shadows !== false) o.castShadow = true;
   });

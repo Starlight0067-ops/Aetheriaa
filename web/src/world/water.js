@@ -4,8 +4,11 @@
 // depth colour and shoreline foam line up with the terrain without a depth pre-pass.
 // Full: two scrolling wave layers, flow streaks along the river, foam bands, sky reflection (shared sky
 // function), sun glint + sparkles (HDR → bloom). Simple (quality.waterQuality === 'simple'): one wave layer,
-// no sparkles/streaks.
-import { WORLD, POI, RIVER, RIVER_HALF_WIDTH, heightAt } from '../core/layout.js';
+// no sparkles/streaks. Reflect (quality.waterQuality === 'reflect', high/ultra): full + a planar reflection
+// of the real scene (town, bridge, trees, clouds) rendered at half resolution with a mirrored camera and an
+// oblique near plane, distorted by the wave normals. One reflection per frame: the water body that reaches the
+// renderer first owns it, the other falls back to the analytic sky. Fresnel is Schlick with F0 = 0.02 (water).
+import { WORLD, POI, RIVER, RIVER_HALF_WIDTH, heightAt, riverDistance } from '../core/layout.js';
 import { SKY_GLSL, makeNoiseTexture } from '../render/sky.js';
 import { toonUniforms } from '../render/toon.js';
 
@@ -94,6 +97,9 @@ void main() {
 const FRAG = /* glsl */`
 ${SKY_GLSL}
 uniform float uTime; uniform sampler2D uNoise; uniform vec3 uSunColor;
+#ifdef WATER_REFLECT
+uniform sampler2D uRefl; uniform mat4 uReflMat; uniform float uReflOn;
+#endif
 uniform vec3 uShallow; uniform vec3 uMid; uniform vec3 uDeep; uniform vec3 uFoam; uniform float uRiver;
 varying float vDepth; varying vec2 vFlow; varying vec2 vDir; varying vec3 vWorld;
 #include <fog_pars_fragment>
@@ -134,8 +140,21 @@ void main() {
   vec3 R = reflect( -V, N );
   R.y = max( R.y, 0.02 );
   vec3 refl = aeSky( normalize( R ) );
-  float F = 0.06 + 0.94 * pow( 1.0 - NdV, 4.0 );
-  vec3 col = mix( body, refl, clamp( F * 0.9, 0.0, 1.0 ) );
+  #ifdef WATER_REFLECT
+  if ( uReflOn > 0.5 ) {
+    vec4 rc = uReflMat * vec4( vWorld, 1.0 );
+    // wave-normal distortion, fading with distance so far water stays a clean mirror instead of noise
+    vec2 ruv = rc.xy / rc.w + N.xz * ( 0.06 / ( 1.0 + dist * 0.035 ) );
+    vec3 pr = min( texture2D( uRefl, clamp( ruv, 0.002, 0.998 ) ).rgb, vec3( 6.0 ) );
+    // screen-edge fade back to the analytic sky (the mirrored frustum has no data outside the view)
+    vec2 ef = smoothstep( 0.0, 0.04, ruv ) * ( 1.0 - smoothstep( 0.96, 1.0, ruv ) );
+    refl = mix( refl, pr, ef.x * ef.y );
+  }
+  #endif
+  // Schlick fresnel, F0 = 0.02 (water, n = 1.33); the wave slope distribution lifts the facing-angle floor a bit
+  float F = 0.02 + 0.98 * pow( 1.0 - NdV, 5.0 );
+  F = mix( F, 1.0, 0.03 );
+  vec3 col = mix( body, refl, clamp( F, 0.0, 1.0 ) );
 
   // sun glint (toon-crisp) + sparkles
   float rs = max( dot( normalize( R ), uSunDir ), 0.0 );
@@ -168,7 +187,7 @@ void main() {
   col = mix( col, uFoam * ( 0.92 + 0.12 * dot( uSunDir, vec3( 0.0, 1.0, 0.0 ) ) ), foam );
 
   float alpha = mix( 0.42, 0.96, smoothstep( 0.0, 2.2, d ) );
-  alpha = max( alpha, F * 0.9 );
+  alpha = max( alpha, F );
   alpha = max( alpha, foam );
   gl_FragColor = vec4( col, alpha );
   #include <fog_fragment>
@@ -177,6 +196,7 @@ void main() {
 export async function create(ctx) {
   const { THREE, scene, quality } = ctx;
   const full = quality.waterQuality !== 'simple';
+  const reflect = quality.waterQuality === 'reflect';
   const sky = ctx.systems.sky;
   const lighting = ctx.systems.lighting;
   const noise = sky?.noise || makeNoiseTexture(THREE, 256);
@@ -194,10 +214,105 @@ export async function create(ctx) {
       uShallow: { value: C(0x58d8c6) }, uMid: { value: C(0x2aa7c4) }, uDeep: { value: C(0x1a5aa6) }, uFoam: { value: C(0xf4fbff) },
     }]),
     vertexShader: VERT, fragmentShader: FRAG,
-    defines: full ? { WATER_FULL: '' } : {},
+    defines: { ...(full ? { WATER_FULL: '' } : {}), ...(reflect ? { WATER_REFLECT: '' } : {}) },
     transparent: true, depthWrite: true, fog: true,
   });
   const meshes = [];
+
+  // ── planar reflection (high / ultra) ──────────────────────────────────────────────────────────
+  let refl = null;
+  if (reflect) {
+    const { renderer } = ctx;
+    const SCALE = 0.5;
+    const size = new THREE.Vector2();
+    const rt = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, depthBuffer: true, samples: 0 });
+    rt.texture.name = 'water_reflection';
+    rt.texture.generateMipmaps = false;
+    const vcam = new THREE.PerspectiveCamera();
+    const texMat = new THREE.Matrix4();
+    const up = new THREE.Vector3(0, 1, 0), camPos = new THREE.Vector3(), P = new THREE.Vector3(), view = new THREE.Vector3();
+    const look = new THREE.Vector3(), target = new THREE.Vector3(), rot = new THREE.Matrix4();
+    const plane = new THREE.Plane(), clip = new THREE.Vector4(), q = new THREE.Vector4();
+    const frustum = new THREE.Frustum(), pv = new THREE.Matrix4();
+    let frame = 0, owner = null, ownerFrame = -1, busy = false, skip = [], skipAt = -1e9;
+    ctx.updaters.push(() => { frame++; });
+    refl = {
+      rt, texMat,
+      /** @returns {boolean} whether `mesh` shows the planar reflection this frame */
+      update(mesh, camera) {
+        if (busy) return false;
+        if (ownerFrame === frame) return owner === mesh;
+        // one mirror per frame: it goes to the nearest water body inside the view frustum
+        camPos.setFromMatrixPosition(camera.matrixWorld);
+        ownerFrame = frame; owner = null;
+        frustum.setFromProjectionMatrix(pv.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+        let bestD = 420;                                  // beyond this the analytic sky is indistinguishable
+        for (const m of meshes) {
+          if (camPos.y < m.userData.waterY + 0.15 || !frustum.intersectsObject(m)) continue;
+          const dd = m.userData.waterDist(camPos.x, camPos.z);
+          if (dd < bestD) { bestD = dd; owner = m; }
+        }
+        if (!owner) return false;
+        const y = owner.userData.waterY;
+        renderer.getDrawingBufferSize(size);
+        const w = Math.max(2, Math.round(size.x * SCALE)), h = Math.max(2, Math.round(size.y * SCALE));
+        if (rt.width !== w || rt.height !== h) rt.setSize(w, h);
+        // mirrored camera (three's Reflector maths for the plane y = waterY)
+        P.set(camPos.x, y, camPos.z);
+        view.subVectors(P, camPos).reflect(up).negate().add(P);
+        rot.extractRotation(camera.matrixWorld);
+        look.set(0, 0, -1).applyMatrix4(rot).add(camPos);
+        target.subVectors(P, look).reflect(up).negate().add(P);
+        vcam.position.copy(view);
+        vcam.up.set(0, 1, 0).applyMatrix4(rot).reflect(up);
+        vcam.lookAt(target);
+        vcam.near = camera.near; vcam.far = camera.far;
+        vcam.updateMatrixWorld();
+        vcam.projectionMatrix.copy(camera.projectionMatrix);
+        texMat.set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1);
+        texMat.multiply(vcam.projectionMatrix).multiply(vcam.matrixWorldInverse);
+        // oblique near plane = the water surface (Lengyel): nothing below the water leaks into the mirror
+        plane.setFromNormalAndCoplanarPoint(up, P).applyMatrix4(vcam.matrixWorldInverse);
+        clip.set(plane.normal.x, plane.normal.y, plane.normal.z, plane.constant);
+        const pm = vcam.projectionMatrix.elements;
+        q.x = (Math.sign(clip.x) + pm[8]) / pm[0];
+        q.y = (Math.sign(clip.y) + pm[9]) / pm[5];
+        q.z = -1.0;
+        q.w = (1.0 + pm[10]) / pm[14];
+        clip.multiplyScalar(2.0 / clip.dot(q));
+        pm[2] = clip.x; pm[6] = clip.y; pm[10] = clip.z + 1.0 - 0.003; pm[14] = clip.w;
+        vcam.projectionMatrixInverse.copy(vcam.projectionMatrix).invert();
+
+        // things that never read in a half-res mirror: ground cover, outline hulls (refreshed now and then)
+        if (frame - skipAt > 240) {
+          skipAt = frame; skip = [];
+          scene.traverse((o) => { if (o.isMesh && (o.userData.isOutline || o.userData.noReflect || /grass|groundcover|flower/i.test(o.name))) skip.push(o); });
+        }
+        const vis = skip.map((o) => o.visible);
+        for (const o of skip) o.visible = false;
+        for (const m of meshes) m.visible = false;
+        const curRT = renderer.getRenderTarget(), curXr = renderer.xr.enabled, curShadow = renderer.shadowMap.autoUpdate;
+        busy = true;
+        try {
+          renderer.xr.enabled = false;
+          renderer.shadowMap.autoUpdate = false;        // reuse this frame's cascades
+          renderer.setRenderTarget(rt);
+          renderer.state.buffers.depth.setMask(true);
+          if (renderer.autoClear === false) renderer.clear();
+          renderer.render(scene, vcam);
+        } finally {
+          busy = false;
+          renderer.xr.enabled = curXr;
+          renderer.shadowMap.autoUpdate = curShadow;
+          renderer.setRenderTarget(curRT);
+          for (const m of meshes) m.visible = true;
+          skip.forEach((o, i) => { o.visible = vis[i]; });
+        }
+        return owner === mesh;
+      },
+    };
+  }
+
   const add = (geo, river) => {
     const m = makeMat(river);
     // shared, live uniforms (merge clones values)
@@ -207,6 +322,19 @@ export async function create(ctx) {
     mesh.name = river ? 'river' : 'lake';
     mesh.renderOrder = 1;
     mesh.receiveShadow = false; mesh.castShadow = false;
+    mesh.userData.waterY = river ? WORLD.waterLevel : POI.lake.y;
+    mesh.userData.waterDist = river ? (x, z) => riverDistance(x, z) : (x, z) => Math.hypot(x - POI.lake.x, z - POI.lake.z) - POI.lake.r;
+    if (refl) {
+      m.uniforms.uRefl = { value: refl.rt.texture };
+      m.uniforms.uReflMat = { value: refl.texMat };
+      m.uniforms.uReflOn = { value: 0 };
+      mesh.onBeforeRender = (renderer, sc, camera) => {
+        let on = false;
+        try { on = camera === ctx.camera && refl.update(mesh, camera); } catch (e) { console.warn('[water] reflection', e); }
+        m.uniforms.uReflOn.value = on ? 1 : 0;
+        m.uniformsNeedUpdate = true;
+      };
+    }
     scene.add(mesh);
     meshes.push(mesh);
     return mesh;
@@ -214,5 +342,5 @@ export async function create(ctx) {
   let river = null, lake = null;
   try { river = add(buildRiver(THREE), true); } catch (e) { console.error('[water] river failed', e); }
   try { lake = add(buildLake(THREE), false); } catch (e) { console.error('[water] lake failed', e); }
-  return { mesh: river, river, lake, meshes };
+  return { mesh: river, river, lake, meshes, reflection: refl };
 }

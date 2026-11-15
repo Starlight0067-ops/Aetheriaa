@@ -47,7 +47,9 @@ function makePavementMask() {
   g.fillStyle = g.strokeStyle = '#fff';
   g.lineJoin = 'round'; g.lineCap = 'butt';
   for (const st of streetList()) {
-    g.lineWidth = Math.max(0.5, st.w - 1.1);
+    // full tread width: the hole ends under the curb (curbs + skirts span hw .. hw+0.28 and go 0.6 m into the
+    // ground), so no terrain sliver can poke through the outer half metre of a stair tread
+    g.lineWidth = st.w + 0.55;
     g.beginPath();
     st.pts.forEach(([x, z], i) => (i ? g.lineTo(x, z) : g.moveTo(x, z)));
     g.stroke();

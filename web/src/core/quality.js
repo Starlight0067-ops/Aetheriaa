@@ -6,12 +6,17 @@
 // Fields: pixelRatio (absolute cap, CSS px), shadows + shadowMapSize/cascades/shadowFar (CSM), bloom, smaa,
 // ao (depth AO), outlines, grassDensity/treeDensity, drawDistance, waterQuality, anisotropy,
 // pbrSpecular (GGX + sky IBL specular lobe), normalMaps (generated/loaded detail normals on buildings),
-// ink (world depth-ink strength), minScale (lowest dynamic-resolution factor the governor may reach).
+// ink (world depth-ink strength), minScale (lowest dynamic-resolution factor the governor may reach),
+// hdri (load + prefilter the Poly Haven HDRI for image-based lighting), ao: false | 'gtao' (ground-truth AO
+// pass with Poisson denoise), waterQuality: 'simple' | 'full' | 'reflect' (full + half-res planar reflection),
+// cloudSteps (0 = flat-lit cloud cards, >0 = self-shadow march through the cloud density).
+// low / medium never load the HDRI nor run the extra passes; `auto` on phones resolves to low (or a trimmed
+// medium on flagship GPUs) — see mobileVariant().
 export const PRESETS = {
-  low:    { name: 'low',    pixelRatio: 0.6,  shadows: true, shadowMapSize: 1024, cascades: 1, shadowFar: 45,  bloom: false, smaa: false, ao: false, outlines: 'characters', grassDensity: 0.15, treeDensity: 0.4, drawDistance: 340,  waterQuality: 'simple', anisotropy: 2,  pbrSpecular: false, normalMaps: false, ink: 0.0,  minScale: 0.6 },
-  medium: { name: 'medium', pixelRatio: 1.0,  shadows: true, shadowMapSize: 2048, cascades: 3, shadowFar: 130, bloom: true,  smaa: true,  ao: false, outlines: 'characters', grassDensity: 0.6,  treeDensity: 0.8, drawDistance: 650,  waterQuality: 'full',   anisotropy: 4,  pbrSpecular: true,  normalMaps: true,  ink: 0.18, minScale: 0.6 },
-  high:   { name: 'high',   pixelRatio: 1.0,  shadows: true, shadowMapSize: 2048, cascades: 4, shadowFar: 220, bloom: true,  smaa: true,  ao: true,  outlines: 'all',        grassDensity: 1.0,  treeDensity: 1.0, drawDistance: 950,  waterQuality: 'full',   anisotropy: 8,  pbrSpecular: true,  normalMaps: true,  ink: 0.25, minScale: 0.65 },
-  ultra:  { name: 'ultra',  pixelRatio: 1.5,  shadows: true, shadowMapSize: 4096, cascades: 4, shadowFar: 320, bloom: true,  smaa: true,  ao: true,  outlines: 'all',        grassDensity: 1.6,  treeDensity: 1.3, drawDistance: 1300, waterQuality: 'full',   anisotropy: 16, pbrSpecular: true,  normalMaps: true,  ink: 0.25, minScale: 0.7 },
+  low:    { name: 'low',    pixelRatio: 0.6,  shadows: true, shadowMapSize: 1024, cascades: 1, shadowFar: 45,  bloom: false, smaa: false, ao: false, hdri: false, cloudSteps: 0, outlines: 'characters', grassDensity: 0.15, treeDensity: 0.4, drawDistance: 340,  waterQuality: 'simple', anisotropy: 2,  pbrSpecular: false, normalMaps: false, ink: 0.0,  minScale: 0.6 },
+  medium: { name: 'medium', pixelRatio: 1.0,  shadows: true, shadowMapSize: 2048, cascades: 3, shadowFar: 130, bloom: true,  smaa: true,  ao: false, hdri: false, cloudSteps: 0, outlines: 'characters', grassDensity: 0.6,  treeDensity: 0.8, drawDistance: 650,  waterQuality: 'full',   anisotropy: 4,  pbrSpecular: true,  normalMaps: true,  ink: 0.18, minScale: 0.6 },
+  high:   { name: 'high',   pixelRatio: 1.0,  shadows: true, shadowMapSize: 2048, cascades: 4, shadowFar: 220, bloom: true,  smaa: true,  ao: 'gtao', hdri: true, cloudSteps: 4, outlines: 'all',        grassDensity: 1.0,  treeDensity: 1.0, drawDistance: 950,  waterQuality: 'reflect',   anisotropy: 8,  pbrSpecular: true,  normalMaps: true,  ink: 0.25, minScale: 0.65 },
+  ultra:  { name: 'ultra',  pixelRatio: 1.5,  shadows: true, shadowMapSize: 4096, cascades: 4, shadowFar: 320, bloom: true,  smaa: true,  ao: 'gtao', hdri: true, cloudSteps: 6, outlines: 'all',        grassDensity: 1.6,  treeDensity: 1.3, drawDistance: 1300, waterQuality: 'reflect',   anisotropy: 16, pbrSpecular: true,  normalMaps: true,  ink: 0.25, minScale: 0.7 },
 };
 
 export function detectGPU() {
@@ -39,7 +44,8 @@ function mobileVariant(base, strong) {
   // render at roughly half the native density: ≥1 CSS px (never blurrier than a desktop page), capped
   q.pixelRatio = Math.min(dpr, Math.max(1.0, Math.min(dpr * 0.5, strong ? 1.5 : 1.25)));
   q.minScale = 0.6;
-  q.ao = false;
+  q.ao = false; q.hdri = false; q.cloudSteps = 0;
+  if (q.waterQuality === 'reflect') q.waterQuality = 'full';
   q.smaa = false;                                   // high DPR hides aliasing; saves a full-screen pass
   q.shadowMapSize = Math.min(q.shadowMapSize, strong ? 2048 : 1024);
   q.cascades = Math.min(q.cascades, strong ? 2 : 1);
@@ -64,7 +70,9 @@ export function resolveQuality(requested) {
   if (mobile) {
     const mem = navigator.deviceMemory || 4, cores = navigator.hardwareConcurrency || 4;
     const strong = /Apple (A1[5-9]|M\d)|Apple GPU|Adreno \(TM\) (7[3-9]\d|8\d\d)|Mali-G(7[1-9]\d|[89]\d\d)|Immortalis|Xclipse 9/i.test(gpu) && cores >= 6 && mem >= 4;
-    q = mobileVariant(PRESETS[strong ? 'medium' : 'low'], strong);
+    // phones / tablets always start from `low` (no HDRI, no AO / reflection passes); flagship GPUs only get a
+    // sharper pixel ratio on top of it
+    q = mobileVariant(PRESETS.low, strong);
   } else {
     const software = /SwiftShader|llvmpipe|Software/i.test(gpu);
     const weak = /Intel|UHD|Iris|Mali|Adreno|PowerVR/i.test(gpu);

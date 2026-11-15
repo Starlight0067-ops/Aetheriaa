@@ -3,6 +3,7 @@
 // and global aerial perspective / height fog that matches the horizon colour.
 // API: { dome, clouds, colors: {zenith, mid, horizon, band, fog, sunGlow}, skyGLSL, skyUniforms }
 import { toonUniforms } from './toon.js';
+import { loadEnvironment } from './environment.js';
 
 // Shared GLSL: sky radiance for a world direction (used by the dome and by water reflections).
 export const SKY_GLSL = /* glsl */`
@@ -377,5 +378,11 @@ export async function create(ctx) {
     console.error('[sky] clouds failed', e);
   }
 
-  return { dome, clouds, colors, skyGLSL: SKY_GLSL, skyUniforms, noise };
+  // Real HDRI image-based lighting (high / ultra only: low / medium never download or prefilter it).
+  const api = { dome, clouds, colors, skyGLSL: SKY_GLSL, skyUniforms, noise, environment: null };
+  if (quality.hdri) {
+    ctx.pending.push(loadEnvironment(ctx).then((env) => { api.environment = env; })
+      .catch((e) => console.warn('[sky] HDRI environment unavailable, analytic sky IBL stays', e)));
+  }
+  return api;
 }

@@ -1,12 +1,22 @@
 // AETHERIA — post stack (owner: render). pmndrs `postprocessing`:
-//   RenderPass (HDR half-float) → EffectPass[ depth AO (high/ultra) · bloom (threshold: emissive + sun only) ·
+//   RenderPass (HDR half-float) → GTAO (high/ultra: three's GTAOPass driven in place on the HDR buffer, normals
+//   reconstructed from the composer depth, Poisson denoise) → EffectPass[ bloom (threshold: emissive + sun only) ·
 //   grade (AgX "punchy" tone map, warm-highlight / cool-shadow split tone, saturation, depth ink lines,
-//   vignette) ] → EffectPass[ SMAA ] (when enabled).
+//   vignette) ] → EffectPass[ SMAA ] (when enabled). low / medium run no AO pass at all.
+//
+// Anti-aliasing: SMAA stays, temporal AA is deliberately NOT used. In the WebGL renderer the only temporal
+// options are three's TAARenderPass (plain multi-frame accumulation: it only converges on a static image, so
+// skinned characters, swaying foliage, water and the orbit camera smear/ghost unless accumulation is reset
+// every frame, which degenerates to no AA) and a hand-rolled reprojection TAA, which needs per-object motion
+// vectors for skinned + instanced + vertex-animated (wind) geometry — a second scene pass with a velocity
+// variant of every custom shader in this project. three's real TRAA (TRAANode) exists only for the
+// WebGPU/TSL renderer. SMAA is single-frame, so animated characters never ghost.
 // API: { composer, render(dt), resize(w,h), depthTexture (getter), grade (uniform access), setExposure(v) }
 import {
   EffectComposer, RenderPass, EffectPass, Effect, EffectAttribute, BlendFunction,
-  BloomEffect, SMAAEffect, SMAAPreset,
+  BloomEffect, SMAAEffect, SMAAPreset, Pass,
 } from 'postprocessing';
+import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 import { setOutlineViewport } from './toon.js';
 import { heightAt } from '../core/layout.js';
 
@@ -58,6 +68,38 @@ class AOEffect extends Effect {
       ]),
     });
   }
+}
+
+/** three's GTAOPass inside the pmndrs composer. The AO + denoise targets are private to the pass; the result is
+ *  multiplied straight onto the HDR input buffer (no buffer swap → the composer's depth texture is never bound
+ *  as an attachment and a sampler at the same time). */
+class GTAOAdapter extends Pass {
+  constructor(scene, camera, { samples = 16, radius = 1.1, intensity = 1.0, scale = 1.0 } = {}) {
+    super('AetheriaGTAO');
+    this.needsSwap = false;
+    this.needsDepthTexture = true;
+    this.resScale = scale;
+    this.gtao = new GTAOPass(scene, camera, 256, 256, undefined,
+      { radius, distanceExponent: 1.0, thickness: 1.0, scale: 1.0, samples, distanceFallOff: 1.0, screenSpaceRadius: false },
+      { lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 5, radiusExponent: 1.5, rings: 2, samples: 12 });
+    this.gtao.output = GTAOPass.OUTPUT.Off;
+    this.gtao.blendIntensity = intensity;
+    this.ready = false;
+  }
+  setDepthTexture(depthTexture) {
+    this.gtao.setGBuffer(depthTexture, undefined);      // normals reconstructed from depth: no extra scene pass
+    this.ready = true;
+  }
+  render(renderer, inputBuffer) {
+    if (!this.ready) return;
+    const g = this.gtao;
+    g.render(renderer, null, inputBuffer);              // AO + Poisson denoise into g.pdRenderTarget
+    g.blendMaterial.uniforms.intensity.value = g.blendIntensity;
+    g.blendMaterial.uniforms.tDiffuse.value = g.pdRenderTarget.texture;
+    g._renderPass(renderer, g.blendMaterial, inputBuffer);
+  }
+  setSize(w, h) { this.gtao.setSize(Math.max(2, Math.round(w * this.resScale)), Math.max(2, Math.round(h * this.resScale))); }
+  dispose() { this.gtao.dispose(); super.dispose(); }
 }
 
 const GRADE_FRAG = /* glsl */`
@@ -150,13 +192,18 @@ export async function create(ctx) {
   const { THREE, renderer, scene, camera, quality } = ctx;
   renderer.toneMapping = THREE.NoToneMapping;
   const lighting = ctx.systems.lighting;
-  let composer = null, grade = null, ao = null, bloom = null, smaaPass = null, mainPass = null;
+  let composer = null, grade = null, ao = null, gtao = null, bloom = null, smaaPass = null, mainPass = null;
 
   try {
     composer = new EffectComposer(renderer, { frameBufferType: THREE.HalfFloatType, multisampling: 0 });
     composer.addPass(new RenderPass(scene, camera));
     const effects = [];
-    if (quality.ao) {
+    if (quality.ao === 'gtao') {
+      try {
+        gtao = new GTAOAdapter(scene, camera, { samples: quality.name === 'ultra' ? 16 : 8, radius: 1.1, intensity: 0.9 });
+        composer.addPass(gtao);
+      } catch (e) { console.warn('[pipeline] GTAO disabled', e); gtao = null; }
+    } else if (quality.ao) {
       try { ao = new AOEffect(); effects.push(ao); } catch (e) { console.warn('[pipeline] AO disabled', e); }
     }
     if (quality.bloom) {
@@ -196,6 +243,7 @@ export async function create(ctx) {
     r_sun: { pos: [0, 45, 40], target: [140, 120, 160], fov: 60 },
     r_river: { pos: [-75, 16, 30], target: [-100, 4, -20], fov: 55 },
     r_lake: { pos: [110, 32, -160], target: [170, 11, -240], fov: 55 },
+    r_water: { pos: [-103, 6.5, 48], target: [-98, 9, 3], fov: 55 },
     r_test: { pos: [-9, 25.2, 11], target: [0, 23.2, 0], fov: 50 },
     r_testback: { pos: [9, 25.2, -11], target: [0, 23.2, 0], fov: 50 },
   };
@@ -238,8 +286,9 @@ export async function create(ctx) {
       if (mainPass) mainPass.renderToScreen = true;
       return true;
     }
-    if (gov.stage <= 2) {
-      gov.stage = 2;
+    if (gov.stage <= 2 && gtao && gtao.enabled) { gov.stage = 2; gtao.enabled = false; return true; }
+    if (gov.stage <= 3) {
+      gov.stage = 3;
       const lights = lighting?.csm ? lighting.csm.lights : (lighting?.sun ? [lighting.sun] : []);
       for (const l of lights) l.castShadow = false;
       return lights.length > 0;
@@ -287,7 +336,7 @@ export async function create(ctx) {
   resize(innerWidth, innerHeight);
 
   return {
-    composer, render, resize, grade, bloom, ao,
+    composer, render, resize, grade, bloom, ao, gtao,
     get depthTexture() { return composer?.inputBuffer?.depthTexture || null; },
     setExposure(v) { grade?.uniforms.get('uExposure') && (grade.uniforms.get('uExposure').value = v); },
   };

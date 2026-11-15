@@ -69,11 +69,13 @@ export function dressPlaza(ctx, plan, piece, batch, dyn) {
   // ---------- festival poles around the fountain + bunting canopy
   const poles = [];
   for (let k = 0; k < 6; k++) {
-    const a = deg(30 + 60 * k);
+    // 45° + 60°k: no pole sits on the spawn → fountain axis (a pole at 90° used to stop a player walking
+    // straight north from the spawn point) nor on the west / east street axes
+    const a = deg(45 + 60 * k);
     const [x, z] = pol(9.6, a);
     add(batch, 'pole', x, Y, z, a, tints(R));
     poles.push({ a, top: [x, Y + 6.1, z] });
-    ctx.colliders.push({ kind: 'box', center: [x, Y + 1, z], half: [0.4, 1, 0.4], rotationY: 0 });
+    ctx.colliders.push({ kind: 'box', center: [x, Y + 1, z], half: [0.3, 1, 0.3], rotationY: 0 });   // shaft + plinth core only
   }
   for (let k = 0; k < 6; k++) dyn.bunting.push({ a: poles[k].top, b: poles[(k + 1) % 6].top, sag: 0.9, palette: k });
   const ring = plan.houses.filter((h) => h.street === 'plaza');

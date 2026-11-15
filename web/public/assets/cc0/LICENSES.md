@@ -20,6 +20,14 @@ Atribución no requerida; se acredita igualmente.
 
 Descarga desde https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/<id>/ (URLs obtenidas de https://api.polyhaven.com/files/<id>). La política de licencia de Poly Haven es CC0 para todo el sitio. La API `/info` no expone un campo de licencia por activo, así que esta licencia se basa en esa política del sitio.
 
+## hdri/ (cielo HDR Poly Haven, 1k .hdr)
+
+| Archivo | Fuente URL | Licencia | Autor |
+|---|---|---|---|
+| hdri/kloofendal_48d_partly_cloudy_puresky_1k.hdr | https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky (descarga: https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/kloofendal_48d_partly_cloudy_puresky_1k.hdr, URL obtenida de api.polyhaven.com/files) | CC0 1.0 | Greg Zaal (original), Jarod Guest (edición del cielo) |
+
+Uso: iluminación basada en imagen (difusa + especular) en los presets `high` / `ultra` (`src/render/environment.js`). Los presets `low` / `medium` no lo descargan.
+
 ## buildings/ (modelos glb low-poly)
 
 Fuente común: paquete npm `@netforge/asset-library-files@0.2.0`, tarball https://registry.npmjs.org/@netforge/asset-library-files/-/asset-library-files-0.2.0.tgz, carpeta `library/lowpoly/`. Su NOTICE indica que los archivos son copias optimizadas de arte de terceros en CC0 1.0 (Quaternius y Kenney). El wrapper npm está bajo MIT, pero el contenido de `library/` es CC0. Los archivos individuales no indican pack de origen, así que la columna Autor da el autor del conjunto.
