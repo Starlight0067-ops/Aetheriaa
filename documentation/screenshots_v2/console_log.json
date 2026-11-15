@@ -1,0 +1,55 @@
+[
+  {
+    "view": "plaza",
+    "file": "/home/user/Aetheriaa/documentation/screenshots_v2/plaza.png",
+    "errors": [
+      "[warning] THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.",
+      "[warning] [.WebGL-0x1fbc001a9600]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+      "[warning] [.WebGL-0x1fbc001a9600]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+      "[warning] [.WebGL-0x1fbc001a9600]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels",
+      "[warning] [.WebGL-0x1fbc001a9600]GL Driver Message (OpenGL, Performance, GL_CLOSE_PATH_NV, High): GPU stall due to ReadPixels (this message will no longer repeat)"
+    ]
+  },
+  {
+    "view": "street",
+    "file": "/home/user/Aetheriaa/documentation/screenshots_v2/street.png",
+    "errors": [
+      "[warning] THREE.Clock: This module has been deprecated. Please use THREE.Timer instead."
+    ]
+  },
+  {
+    "view": "bridge",
+    "file": "/home/user/Aetheriaa/documentation/screenshots_v2/bridge.png",
+    "errors": [
+      "[warning] THREE.Clock: This module has been deprecated. Please use THREE.Timer instead."
+    ]
+  },
+  {
+    "view": "overview",
+    "file": "/home/user/Aetheriaa/documentation/screenshots_v2/overview.png",
+    "errors": [
+      "[warning] THREE.Clock: This module has been deprecated. Please use THREE.Timer instead."
+    ]
+  },
+  {
+    "view": "meadow",
+    "file": "/home/user/Aetheriaa/documentation/screenshots_v2/meadow.png",
+    "errors": [
+      "[warning] THREE.Clock: This module has been deprecated. Please use THREE.Timer instead."
+    ]
+  },
+  {
+    "view": "portrait",
+    "file": "/home/user/Aetheriaa/documentation/screenshots_v2/portrait.png",
+    "errors": [
+      "[warning] THREE.Clock: This module has been deprecated. Please use THREE.Timer instead."
+    ]
+  },
+  {
+    "view": "fullbody",
+    "file": "/home/user/Aetheriaa/documentation/screenshots_v2/fullbody.png",
+    "errors": [
+      "[warning] THREE.Clock: This module has been deprecated. Please use THREE.Timer instead."
+    ]
+  }
+]

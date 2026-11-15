@@ -14,7 +14,7 @@ const UP = new V3(0, 1, 0);
 function rockGeometry(seed, opts = {}) {
   const rnd = mulberry32(seed);
   let g = new THREE.IcosahedronGeometry(1, opts.detail ?? 1);
-  g = g.toNonIndexed();
+  if (g.index) g = g.toNonIndexed();
   const p = g.attributes.position;
   // displace by smooth noise on the unit sphere (per original direction so shared corners stay welded)
   const k1 = 1.3 + rnd(), off = rnd() * 50;

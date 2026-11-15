@@ -73,9 +73,9 @@ const KIND = {
   roof:    { termWidth: 0.05, termOffset: 0.0, tint: 0.32, rim: 0.0, rimWidth: 0.28, spec: 0.0, specSize: 0.985, trans: 0, sphere: 0, up: 0, bias: 0, lit: 1.0, amb: 0.95, pbr: 1.0, wrap: 0.06, rough: 0.58 },
   wood:    { termWidth: 0.06, termOffset: 0.0, tint: 0.35, rim: 0.0, rimWidth: 0.3, spec: 0.0, specSize: 0.97, trans: 0, sphere: 0, up: 0, bias: 0, lit: 1.0, amb: 1.0, pbr: 1.0, wrap: 0.06, rough: 0.72 },
   plaster: { termWidth: 0.08, termOffset: 0.0, tint: 0.40, rim: 0.0, rimWidth: 0.3, spec: 0.0, specSize: 0.97, trans: 0, sphere: 0, up: 0, bias: 0, lit: 1.0, amb: 1.08, pbr: 1.0, wrap: 0.08, rough: 0.9 },
-  cloth:   { termWidth: 0.12, termOffset: -0.05, tint: 0.40, rim: 0.4, rimWidth: 0.4, spec: 0.0, specSize: 0.97, trans: 0.1, sphere: 0, up: 0, bias: 0.05, lit: 1.0, amb: 1.0, pbr: 0.7, wrap: 0.3, rough: 0.88 },
-  skin:    { termWidth: 0.05, termOffset: -0.05, tint: 0.45, rim: 0.3, rimWidth: 0.3, spec: 0.0, specSize: 0.97, trans: 0, sphere: 0, up: 0, bias: 0.02, lit: 1.0, amb: 1.05, warm: true, pbr: 0.65, wrap: 0.4, rough: 0.55 },
-  hair:    { termWidth: 0.05, termOffset: 0.0, tint: 0.40, rim: 0.35, rimWidth: 0.3, spec: 0.45, specSize: 0.95, trans: 0, sphere: 0, up: 0, bias: 0.02, lit: 1.0, amb: 1.0, pbr: 0.6, wrap: 0.3, rough: 0.5 },
+  cloth:   { termWidth: 0.12, termOffset: -0.05, tint: 0.40, rim: 0.4, rimWidth: 0.4, spec: 0.0, specSize: 0.97, trans: 0.1, sphere: 0, up: 0, bias: 0.08, lit: 1.0, amb: 1.0, pbr: 0.7, wrap: 0.3, rough: 0.88 },
+  skin:    { termWidth: 0.05, termOffset: -0.05, tint: 0.45, rim: 0.3, rimWidth: 0.3, spec: 0.0, specSize: 0.97, trans: 0, sphere: 0, up: 0, bias: 0.08, lit: 1.0, amb: 1.05, warm: true, pbr: 0.65, wrap: 0.4, rough: 0.55 },
+  hair:    { termWidth: 0.05, termOffset: 0.0, tint: 0.40, rim: 0.35, rimWidth: 0.3, spec: 0.45, specSize: 0.95, trans: 0, sphere: 0, up: 0, bias: 0.08, lit: 1.0, amb: 1.0, pbr: 0.6, wrap: 0.3, rough: 0.5 },
   metal:   { termWidth: 0.04, termOffset: 0.05, tint: 0.30, rim: 0.2, rimWidth: 0.25, spec: 1.2, specSize: 0.975, trans: 0, sphere: 0, up: 0, bias: 0, lit: 0.85, amb: 0.8, pbr: 1.0, wrap: 0.0, rough: 0.35 },
   water:   { termWidth: 0.2, termOffset: 0.0, tint: 0.2, rim: 0.5, rimWidth: 0.4, spec: 2.5, specSize: 0.993, trans: 0, sphere: 0, up: 0, bias: 0, lit: 0.6, amb: 0.9, pbr: 1.0, wrap: 0.0, rough: 0.08 },
   glow:    { termWidth: 0.3, termOffset: 0.0, tint: 0.1, rim: 0.6, rimWidth: 0.5, spec: 0.0, specSize: 0.97, trans: 0, sphere: 0, up: 0, bias: 0, lit: 0.6, amb: 0.6, pbr: 0.0, wrap: 0.0, rough: 1.0 },
@@ -162,7 +162,8 @@ uniform float uWrap;
 uniform vec3 uSkyZenith;
 uniform vec3 uSkyHorizon;
 
-float toonShadow() {
+// slope: 0 facing the sun .. 1 grazing/back-facing → slope-scaled depth bias (no acne on the wrapped terminator)
+float toonShadow( float slope ) {
   float s = 1.0;
   #if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
   if ( receiveShadow ) {
@@ -176,7 +177,7 @@ float toonShadow() {
       if ( linearDepth >= CSM_cascades[ i ].x && linearDepth < CSM_cascades[ i ].y ) {
         tls = directionalLightShadows[ i ];
         tsc = vDirectionalShadowCoord[ i ];
-        tsc.z -= uShadowBias * 0.0016 * tsc.w;
+        tsc.z -= ( uShadowBias + 0.09 * slope ) * 0.0016 * tsc.w;
         s = getShadow( directionalShadowMap[ i ], tls.shadowMapSize, tls.shadowIntensity, tls.shadowBias, tls.shadowRadius, tsc );
       }
       #endif
@@ -186,7 +187,7 @@ float toonShadow() {
     #else
     tls = directionalLightShadows[ 0 ];
     tsc = vDirectionalShadowCoord[ 0 ];
-    tsc.z -= uShadowBias * 0.0016 * tsc.w;
+    tsc.z -= ( uShadowBias + 0.09 * slope ) * 0.0016 * tsc.w;
     s = getShadow( directionalShadowMap[ 0 ], tls.shadowMapSize, tls.shadowIntensity, tls.shadowBias, tls.shadowRadius, tsc );
     #endif
   }
@@ -209,7 +210,7 @@ const FRAG_LIGHT = /* glsl */`
   tSun = directionalLights[ 0 ].color;
   #endif
   float tNdL = dot( tN, tL );
-  float tRaw = toonShadow();
+  float tRaw = toonShadow( 1.0 - saturate( tNdL ) );
   float tSh = mix( smoothstep( 0.18, 0.82, tRaw ), tRaw, uPbr );
   float tLit = smoothstep( uTermOffset - uTermWidth, uTermOffset + uTermWidth, tNdL );
   tLit = mix( tLit, saturate( ( tNdL + uWrap ) / ( 1.0 + uWrap ) ), uPbr );

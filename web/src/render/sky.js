@@ -222,7 +222,7 @@ export async function create(ctx) {
 
   const far = camera.far;
   installFog(THREE, sunDir, colors.sunGlow, {
-    aerLin: 0.00045, aerQuad: 1.2, aerStart: 220, aerRange: 160, aerH: 400, cap: 0.72,
+    aerLin: 0.00045, aerQuad: 0.75, aerStart: 250, aerRange: 210, aerH: 400, cap: 0.68,
     mist: 0.004, mistFalloff: 1 / 18,
     hazeHigh: colors.horizon.clone().lerp(colors.mid, 0.4),
   });

@@ -139,8 +139,8 @@ void main() {
 
   // sun glint (toon-crisp) + sparkles
   float rs = max( dot( normalize( R ), uSunDir ), 0.0 );
-  col += uSunColor * smoothstep( 0.9965, 0.9985, rs ) * 4.0;
-  col += uSunColor * pow( rs, 60.0 ) * 0.35;
+  // sun glint: tight GGX-like core with a soft halo (physically plausible highlight instead of a hard disc)
+  col += uSunColor * ( pow( rs, 900.0 ) * 5.0 + pow( rs, 140.0 ) * 0.9 + pow( rs, 24.0 ) * 0.22 ) * mix( 0.25, 1.0, F );
   #ifdef WATER_FULL
   {
     vec2 sp = vWorld.xz * 0.55;

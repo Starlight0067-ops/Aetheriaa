@@ -1,7 +1,7 @@
 // Cobbled streets, stair flights, curbs, retaining skirts and the plaza paving, generated on heightAt.
 import * as THREE from 'three';
-import { heightAt, POI } from '../../core/layout.js';
-import { polyLength, sampleAt } from './plan.js';
+import { heightAt, POI, distToPolyline } from '../../core/layout.js';
+import { polyLength, sampleAt, streetList } from './plan.js';
 
 class GeoBuf {
   constructor() { this.p = []; this.n = []; this.uv = []; this.c = []; this.i = []; }
@@ -46,6 +46,7 @@ class GeoBuf {
   }
 }
 
+const STREET_GAPS = streetList();
 const RISE = 0.17;
 const UP = [0, 1, 0];
 
@@ -88,6 +89,9 @@ export function buildStreets(streets, mats, opts = {}) {
     const col = new GeoBuf();
     for (let i = 0; i < S.length - 1; i++) {
       const a = S[i], b = S[i + 1];
+      // the plaza disc has its own paving: streets stop at its rim instead of laying a second, nearly coplanar
+      // cobble layer (and curbs) across it
+      if (Math.hypot((a.x + b.x) / 2 - POI.plaza.x, (a.z + b.z) / 2 - POI.plaza.z) < POI.plaza.r - 0.7) continue;
       const ya = a.hq, yb = a.steep || b.steep ? a.hq : b.hq;   // treads are flat
       const L = (q, y, k) => [q.x + q.nx * hw * k, y, q.z + q.nz * hw * k];
       // tread
@@ -187,6 +191,9 @@ export function buildPlaza(mats) {
     const a0 = (i / N) * Math.PI * 2, a1 = ((i + 1) / N) * Math.PI * 2;
     const p = (rr, a, yy) => [cx + rr * Math.cos(a), yy, cz + rr * Math.sin(a)];
     const am = (a0 + a1) / 2, out = [Math.cos(am), 0, Math.sin(am)];
+    // open the curb ring where a street enters the plaza (no kerb wall across the carriageway)
+    const mx = cx + (R + 0.25) * out[0], mz = cz + (R + 0.25) * out[2];
+    if (STREET_GAPS.some((st) => distToPolyline(mx, mz, st.pts) < st.w / 2 + 0.5)) continue;
     deco.toward([p(R, a0, y + 0.22), p(R, a1, y + 0.22), p(R + 0.5, a1, y + 0.22), p(R + 0.5, a0, y + 0.22)], UP, 'xz', 1.0);
     deco.toward([p(R, a0, y), p(R, a1, y), p(R, a1, y + 0.22), p(R, a0, y + 0.22)], [-out[0], 0, -out[2]], 'wall', 0.9);
     const g0 = Math.min(heightAt(...[p(R + 0.5, a0, 0)[0], p(R + 0.5, a0, 0)[2]]), y) - 0.5;
