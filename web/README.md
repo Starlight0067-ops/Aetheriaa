@@ -17,6 +17,42 @@ npm run dev          # http://127.0.0.1:5173
 
 Build a production bundle with `npm run build` (`web/dist/`) and serve it with `npm run preview`.
 
+## Play in the browser
+
+The game is a static site: build once, then serve the folder over http.
+
+```sh
+cd web
+npm install                 # first time only
+npm run build               # -> web/dist/ (multi-file, relative paths, works from any folder)
+npm run serve:dist          # vite preview --host on dist/ (default port 4173)
+```
+
+Then open `http://127.0.0.1:4173/?quality=medium`, or run `./play.sh` / `play.bat` to serve `dist/` on
+`http://127.0.0.1:8080` with `python3 -m http.server` (fallback `npx serve`).
+
+Single-file build (JS and CSS inlined in one HTML):
+
+```sh
+npm run build:single        # -> web/dist-single/aetheria.html + assets/ (GLB, textures) next to it
+./play.sh dist-single       # or play.bat dist-single; then open http://127.0.0.1:8080/aetheria.html
+```
+
+The big runtime assets (`assets/`, GLB, textures, VRM) are not inlined. Serve the folder over http: opening the
+HTML with `file://` fails because the assets are fetched.
+
+URL parameters:
+
+- `?quality=low|medium|high|ultra` sets the quality preset (`low` for weak GPUs and phones, default `medium`).
+- `?touch=1` forces the touch overlay on; `?touch=0` turns it off. Coarse-pointer devices get it by default.
+- `?view=<name>` opens a fixed camera view for captures (see "Screenshot views" below).
+
+Static hosting: the contents of `dist/` can be published to GitHub Pages or Netlify. Runtime asset paths in `src/`
+are absolute (`/assets/...`), so the site must be served at the domain root (for example a Netlify site or a custom
+domain). A project page under `https://<user>.github.io/<repo>/` will 404 those assets until they are switched to
+`import.meta.env.BASE_URL`. The manual workflow `.github/workflows/pages.yml` builds `web/` and deploys `dist/`
+through `actions/deploy-pages`; it only runs when started by hand and needs Pages set to "GitHub Actions".
+
 ## Screenshot views
 
 The app accepts `?view=<name>&quality=<preset>` for reproducible captures:
