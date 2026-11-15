@@ -16,7 +16,7 @@ async function boot(browser, ctxOpts, query) {
 }
 const snap = (p) => p.evaluate(() => __game.snapshot());
 const step = (p, n = 1) => p.evaluate((n) => __game.step(n), n);
-const shot = async (p, name) => { await p.evaluate(() => __game.render()); await p.waitForTimeout(2500); await p.evaluate(() => __game.render()); await p.waitForTimeout(2500); await p.screenshot({ path: OUT + name + '.png' }); };
+const shot = async (p, name) => { await p.evaluate(() => __game.render()); await p.waitForTimeout(2500); await p.evaluate(() => __game.render()); await p.waitForTimeout(2500); try { await p.screenshot({ path: OUT + name + '.png', timeout: 120000 }); } catch (e) { console.log('shot failed', name, e.message); } };
 async function tap(p, code, frames = 2) { await p.evaluate(([c, f]) => __game.tap(c, f), [code, frames]); }
 async function talkThrough(p, max = 60) {
   return p.evaluate((max) => { const g = __game; for (let i = 0; i < max; i++) { if (!g.G.ui.dialog.active) return i; g.key('KeyF'); g.keyUp('KeyF'); if (g.G.ui.dialog.active) { g.key('Digit1'); g.keyUp('Digit1'); } } return -1; }, max);
