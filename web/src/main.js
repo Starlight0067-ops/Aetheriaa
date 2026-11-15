@@ -27,7 +27,7 @@ document.getElementById('app').appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, quality.drawDistance);
-const clock = new THREE.Clock();
+const timer = new THREE.Timer();
 
 const ctx = {
   THREE, renderer, scene, camera, quality, params, shot,
@@ -84,8 +84,10 @@ async function boot() {
   setTimeout(() => loading.remove(), 700);
   await Promise.allSettled(ctx.pending);
   let frames = 0;
+  timer.update();
   renderer.setAnimationLoop(() => {
-    const dt = Math.min(clock.getDelta(), 1 / 20);
+    timer.update();
+    const dt = Math.min(timer.getDelta(), 1 / 20);
     ctx.time += dt;
     for (const u of ctx.updaters) u(dt, ctx.time);
     ctx.viewUpdate?.();

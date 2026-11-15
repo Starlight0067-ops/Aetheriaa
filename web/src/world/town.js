@@ -1,3 +1,4 @@
+import { asset } from '../core/paths.js';
 // Vael Harrow — town assembly (owner: town agent).
 // Kit pieces come from tools/blender/town/*.py (GLBs in public/assets/town). The plan (plan.js) places
 // houses along the street backbone on heightAt; everything static is batched per material.
@@ -15,7 +16,7 @@ import { createDynamics } from './town/dynamic.js';
 import { HOUSE_KIT_PIECES, buildKitHouses } from './town/medievalkit.js';
 import { loadCC0Buildings, addCC0House, buildCC0Houses } from './town/cc0buildings.js';
 
-const BASE = '/assets/town/';
+const BASE = asset('assets/town/');
 // per-house tints for the Quaternius kit houses (multiplied with the kit's plaster / roof-tile textures)
 const KIT_PLASTER = [0xffffff, 0xfff1d6, 0xf6e3c4, 0xffe9dc, 0xe9eef2, 0xf7f0e2, 0xf3dcc0, 0xfdf6e8];
 const KIT_ROOF = [0xffffff, 0xf2d9cc, 0xffe2cf, 0xdcc0b4, 0xf5cdb5, 0xcfd6dc, 0xffffff, 0xe8c4ae];

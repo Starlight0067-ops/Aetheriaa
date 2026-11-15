@@ -1,9 +1,10 @@
+import { asset } from '../../core/paths.js';
 // Nature textures: AI-painted textures from public/assets/textures with procedural canvas fallbacks,
 // plus generated helpers (tileable noise, birch bark, willow strands).
 import * as THREE from 'three';
 import { mulberry32 } from './common.js';
 
-const BASE = '/assets/textures/';
+const BASE = asset('assets/textures/');
 let cache = null;
 
 function canvas(w, h = w) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
@@ -181,7 +182,7 @@ export function loadNatureTextures(ctx) {
   // Third-party CC0 Poly Haven ground textures (public/assets/cc0/ground) replace the painted ones;
   // ?ground=old keeps the previous set. Every step falls back: CC0 file -> painted file -> procedural canvas.
   const cc0 = ctx.params?.get('ground') !== 'old';
-  const CC0 = '/assets/cc0/ground/';
+  const CC0 = asset('assets/cc0/ground/');
   const load = async (name, fallback, opts, cc0Name = null) => {
     let t = null, fromCC0 = false;
     if (cc0 && cc0Name) { try { t = await ctx.assets.tryTexture(CC0 + cc0Name); fromCC0 = !!t; } catch (e) { t = null; } }

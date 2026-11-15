@@ -1,3 +1,4 @@
+import { asset } from '../../core/paths.js';
 // Third-party CC0 building models (public/assets/cc0/buildings, see LICENSES.md there) placed on the
 // town plan instead of the generated half-timbered kit. The plan (positions, yaw, footprints, colliders)
 // is untouched: each model is scaled to the footprint of the house it replaces. One InstancedMesh per
@@ -6,7 +7,7 @@ import * as THREE from 'three';
 import { createToonMaterial } from '../../render/toon.js';
 import { deriveNormalMap } from '../../render/detailmaps.js';
 
-const DIR = '/assets/cc0/buildings/';
+const DIR = asset('assets/cc0/buildings/');
 const NAMES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map((k) => 'building_' + k);
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 

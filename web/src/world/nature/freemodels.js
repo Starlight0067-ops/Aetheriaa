@@ -1,3 +1,4 @@
+import { asset } from '../../core/paths.js';
 // CC0 Quaternius "Stylized Nature MegaKit" integration (public/assets/free/nature, licence CC0 1.0).
 // Loads glTF models, bakes them into per-material parts (foliage parts get wind weights, soft sphere
 // normals and AO vertex colours), builds render-to-texture impostors for distant trees, and provides an
@@ -7,7 +8,7 @@ import * as THREE from 'three';
 import { createToonMaterial } from '../../render/toon.js';
 import { windPatch, depthMaterialFor, hazePatch } from './trees.js';
 
-const BASE = '/assets/free/nature/';
+const BASE = asset('assets/free/nature/');
 const matCache = new Map();
 
 function kindOf(name) {

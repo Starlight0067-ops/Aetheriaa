@@ -1,10 +1,11 @@
+import { asset } from '../../core/paths.js';
 // Vael Harrow materials: one toon material per surface slot used by the Blender kit (material names in the GLBs).
 // Painted textures come from public/assets/textures; every slot has a procedural canvas fallback.
 import * as THREE from 'three';
 import { createToonMaterial } from '../../render/toon.js';
 import { deriveNormalMap } from '../../render/detailmaps.js';
 
-const TEX = '/assets/textures/';
+const TEX = asset('assets/textures/');
 
 function canvas(w, h, draw) {
   const c = document.createElement('canvas');
@@ -97,7 +98,7 @@ export async function createMaterials(ctx) {
   // third-party CC0 Poly Haven cobblestone (albedo + normal) for streets and plaza; ?ground=old keeps the painted one
   let cobbleN = null, cobbleR = null;
   if (ctx.params?.get('ground') !== 'old') {
-    const CC0 = '/assets/cc0/ground/cobblestone_floor_08_';
+    const CC0 = asset('assets/cc0/ground/cobblestone_floor_08_');
     const pbr = ctx.quality.pbrSpecular !== false;
     const [d, n, r] = await Promise.all([A.tryTexture(CC0 + 'diff_1k.jpg'), A.tryTexture(CC0 + 'nor_gl_1k.jpg', { srgb: false }), pbr ? A.tryTexture(CC0 + 'rough_1k.jpg', { srgb: false }) : null]);
     if (d) { cobbleT = d; cobbleN = n || null; cobbleR = r || null; }

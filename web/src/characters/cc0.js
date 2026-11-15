@@ -1,3 +1,4 @@
+import { asset } from '../core/paths.js';
 // Third-party CC0 characters (public/assets/cc0/characters, see LICENSES.md there): rigged low-poly GLBs
 // from Quaternius and Kenney with their own idle / walk / run clips, driven by a THREE.AnimationMixer.
 // createCC0Character() returns the same API as createCharacter() in index.js, so the player controller and
@@ -7,7 +8,7 @@ import * as THREE from 'three';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { createToonMaterial } from '../render/toon.js';
 
-const DIR = '/assets/cc0/characters/';
+const DIR = asset('assets/cc0/characters/');
 
 // cast id -> model. hero = adventurer, blacksmith = worker, elder = hooded adventurer. The townsfolk reuse the
 // same realistic-proportion rigs with their own heights and garment colours (`colors`: material name -> colour),

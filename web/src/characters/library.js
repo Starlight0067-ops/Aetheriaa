@@ -1,3 +1,4 @@
+import { asset } from '../core/paths.js';
 // Asset discovery + animation library (owner: character agent). Browser only.
 // Sources, in priority order:
 //   animations: public/assets/anims/<action>.json (baked, tools/characters/bake_mixamo.mjs)
@@ -34,7 +35,7 @@ export function animationIndex() {
   if (animIndex) return animIndex;
   animIndex = (async () => {
     const idx = {};
-    const man = await fetchJSON('/assets/anims/manifest.json');
+    const man = await fetchJSON(asset('assets/anims/manifest.json'));
     for (const [a, info] of Object.entries(man?.actions || {})) idx[a] = { ...info };
     for (const [path, load] of Object.entries(devFBX)) {
       const a = matchAction(path);
@@ -71,14 +72,14 @@ export function loadNormClip(action) {
 /** URL of a VRM for character `id`, or null. */
 export async function findVRM(id) {
   for (const [path, load] of Object.entries(devVRM)) if (slug(path) === id) return await load();
-  const man = await fetchJSON('/assets/characters/manifest.json');
+  const man = await fetchJSON(asset('assets/characters/manifest.json'));
   if (man?.vrm?.[id]) return man.vrm[id];
-  const url = `/assets/characters/${id}.vrm`;
+  const url = asset(`assets/characters/${id}.vrm`);
   return (await exists(url)) ? url : null;
 }
 
 /** URL of the fallback GLB for `id` (v2 Blender build first, then the legacy one), or null. */
 export async function findGLB(id) {
-  for (const url of [`/assets/characters/${id}.glb`, `/assets/characters/legacy/${id}.glb`]) if (await exists(url)) return url;
+  for (const url of [asset(`assets/characters/${id}.glb`), asset(`assets/characters/legacy/${id}.glb`)]) if (await exists(url)) return url;
   return null;
 }

@@ -1,3 +1,4 @@
+import { asset } from '../../core/paths.js';
 // CC0 Quaternius "Medieval Village MegaKit" (Standard) pieces -> town kit pieces.
 // Every glTF is converted into the same { parts: Map(slot -> geometry) } format as our Blender kit so it
 // goes through the StaticBatcher (one BatchedMesh per material). Their painted base-colour textures are
@@ -7,7 +8,7 @@ import { createToonMaterial } from '../../render/toon.js';
 import { deriveNormalMap } from '../../render/detailmaps.js';
 import { normalizeGeometry } from './batch.js';
 
-const DIR = '/assets/free/medieval/';
+const DIR = asset('assets/free/medieval/');
 
 const SLOT = {
   MI_WoodTrim: ['q_wood', 'wood'], MI_WoodTrim_Wear: ['q_wear', 'wood'], MI_Plaster: ['q_plaster', 'plaster'],
