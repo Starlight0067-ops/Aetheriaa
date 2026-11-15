@@ -18,7 +18,7 @@ const yawTo = (fx, fz, x, z) => Math.atan2(-(fx - x), -(fz - z));   // character
 
 export async function create(ctx) {
   const low = ctx.quality.name === 'low';
-  const list = low ? CAST.filter((c) => ['lyra', 'maren', 'toma'].includes(c.id)) : CAST;
+  const list = low ? CAST.filter((c) => ['lyra', 'maren', 'toma'].includes(c.id)).slice(0, ctx.quality.maxNPCs || 3) : CAST;
   const npcs = [];
   const load = Promise.all(list.map(async (c) => {
     try {
@@ -50,7 +50,8 @@ export async function create(ctx) {
       }
       // hide far NPCs (draw calls), and let eyes/head follow the camera when it comes close
       const d2 = o.position.distanceToSquared(ctx.camera.position);
-      o.visible = d2 < (low ? 45 * 45 : 90 * 90);
+      const vd = ctx.quality.npcDistance || (low ? 45 : 90);
+      o.visible = d2 < vd * vd;
       n.ch.lookAt(d2 < 64 ? ctx.camera : null);
     }
   });

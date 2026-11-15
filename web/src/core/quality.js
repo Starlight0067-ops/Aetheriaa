@@ -12,6 +12,8 @@
 // cloudSteps (0 = flat-lit cloud cards, >0 = self-shadow march through the cloud density).
 // low / medium never load the HDRI nor run the extra passes; `auto` on phones resolves to low (or a trimmed
 // medium on flagship GPUs) — see mobileVariant().
+import { SAFE, isIOS } from './profile.js';
+
 export const PRESETS = {
   low:    { name: 'low',    pixelRatio: 0.6,  shadows: true, shadowMapSize: 1024, cascades: 1, shadowFar: 45,  bloom: false, smaa: false, ao: false, hdri: false, cloudSteps: 0, outlines: 'characters', grassDensity: 0.15, treeDensity: 0.4, drawDistance: 340,  waterQuality: 'simple', anisotropy: 2,  pbrSpecular: false, normalMaps: false, ink: 0.0,  minScale: 0.6 },
   medium: { name: 'medium', pixelRatio: 1.0,  shadows: true, shadowMapSize: 2048, cascades: 3, shadowFar: 130, bloom: true,  smaa: true,  ao: false, hdri: false, cloudSteps: 0, outlines: 'characters', grassDensity: 0.6,  treeDensity: 0.8, drawDistance: 650,  waterQuality: 'full',   anisotropy: 4,  pbrSpecular: true,  normalMaps: true,  ink: 0.18, minScale: 0.6 },
@@ -56,10 +58,36 @@ function mobileVariant(base, strong) {
   return q;
 }
 
+/** mobile-safe profile (core/profile.js): tight memory budget for iOS Safari. Level 2 shrinks it further. */
+function safeVariant(base, level) {
+  const q = { ...base };
+  const w = Math.max(innerWidth, innerHeight), h = Math.min(innerWidth, innerHeight);
+  const maxMP = level >= 2 ? 0.7 : 1.0;                       // drawing-buffer budget (megapixels)
+  q.pixelRatio = Math.min(1, Math.sqrt(maxMP * 1e6 / (w * h)));
+  q.minScale = 1;                                             // governor never goes above the safe canvas; fixed size
+  q.bloom = false; q.smaa = false; q.ao = false; q.hdri = false; q.cloudSteps = 0;
+  q.pbrSpecular = false; q.normalMaps = false; q.waterQuality = 'simple'; q.ink = 0; q.anisotropy = 1;
+  q.outlines = 'characters';
+  q.shadows = true;
+  q.shadowMapSize = level >= 2 ? 512 : 1024;
+  q.cascades = 1; q.shadowFar = level >= 2 ? 28 : 38;
+  q.softShadows = false;
+  q.grassDensity = level >= 2 ? 0.04 : 0.08;
+  q.treeDensity = level >= 2 ? 0.14 : 0.28;
+  q.drawDistance = level >= 2 ? 170 : 240;
+  q.texMax = level >= 2 ? 256 : 512;                          // generated variants in assets/mobile/
+  q.maxNPCs = level >= 2 ? 2 : 3;
+  q.npcDistance = level >= 2 ? 28 : 45;
+  q.maxEnemies = level >= 2 ? 6 : 12;
+  q.safe = level; q.mobile = true;
+  return q;
+}
+
 export function resolveQuality(requested) {
   const gpu = detectGPU();
   window.__AETHERIA_GPU = gpu;
-  const mobile = isMobileDevice();
+  const mobile = isMobileDevice() || SAFE > 0;
+  if (SAFE > 0) return { ...safeVariant(PRESETS.low, SAFE), gpu, auto: false, mobile: true, ios: isIOS() };
   if (requested && PRESETS[requested]) {
     const q = { ...PRESETS[requested], gpu, auto: false, mobile };
     // an explicit preset on a phone still respects the display: never render below 1 CSS px on high-DPR screens

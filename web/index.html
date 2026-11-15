@@ -19,13 +19,22 @@
     #ui { position: fixed; inset: 0; pointer-events: none; font-family: "Segoe UI", system-ui, sans-serif; color: #f4eedc; }
     #loading { position: fixed; inset: 0; display: grid; place-items: center; background: #0b1020; color: #e9fdff;
       font: 600 28px Georgia, serif; letter-spacing: 0.3em; transition: opacity .6s; z-index: 10; }
+    #loading { text-align: center; }
+    #loading .ld-title { display: block; }
+    #loading .ld-bar { width: min(60vw, 320px); height: 4px; margin: 22px auto 0; background: #1c2540; border-radius: 3px; overflow: hidden; }
+    #loading .ld-bar i { display: block; height: 100%; width: 0; background: #7ff5ff; transition: width .25s; }
+    #loading .ld-msg { display: block; margin-top: 12px; font: 400 12px system-ui, sans-serif; letter-spacing: .08em; opacity: .7; }
+    #fatal { position: fixed; inset: 0; z-index: 20; display: none; place-items: center; text-align: center; padding: 24px;
+      background: rgba(11,16,32,.96); color: #e9fdff; font: 500 16px system-ui, sans-serif; }
+    #fatal button { margin-top: 18px; padding: 12px 28px; font: 600 16px system-ui, sans-serif; border-radius: 10px; border: 0; background: #7ff5ff; color: #0b1020; }
     body.shot #ui { display: none; }
   </style>
 </head>
 <body>
   <div id="app"></div>
   <div id="ui"></div>
-  <div id="loading">AETHERIA</div>
+  <div id="loading"><span class="ld-title">AETHERIA</span><div class="ld-bar"><i id="ld-fill"></i></div><span class="ld-msg" id="ld-msg"></span></div>
+  <div id="fatal"><div><div id="fatal-msg"></div><button id="fatal-btn" type="button">Reload</button></div></div>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>

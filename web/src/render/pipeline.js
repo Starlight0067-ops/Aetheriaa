@@ -326,6 +326,7 @@ export async function create(ctx) {
     govern();
     try { lighting?.preRender?.(); } catch (e) { console.warn('[pipeline] preRender', e); }
     syncView();
+    renderer.info.reset();
     if (composer) composer.render(dt);
     else renderer.render(scene, camera);
   }
@@ -337,6 +338,16 @@ export async function create(ctx) {
 
   return {
     composer, render, resize, grade, bloom, ao, gtao,
+    /** Estimated MB held by post-process render targets (half-float input+output, depth, optional passes). */
+    rtInfo() {
+      if (!composer) return 0;
+      const s = renderer.getDrawingBufferSize(new THREE.Vector2()); const px = s.x * s.y;
+      let b = px * (8 * 2 + 4);
+      if (bloom) b += px * 8 * 1.4;
+      if (smaaPass) b += px * 4 * 3;
+      if (gtao) b += px * 4 * 3;
+      return b / 1048576;
+    },
     get depthTexture() { return composer?.inputBuffer?.depthTexture || null; },
     setExposure(v) { grade?.uniforms.get('uExposure') && (grade.uniforms.get('uExposure').value = v); },
   };

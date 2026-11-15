@@ -66,7 +66,8 @@ const FALLBACK = {
 
 /** Copy an image into a canvas, optionally desaturating (for tintable variants) and cropping rows. */
 function processed(img, { desat = 0, gain = 1, crop = null } = {}) {
-  const sx = crop ? crop[0] : 0, sy = crop ? crop[1] : 0, sw = crop ? crop[2] : img.width, sh = crop ? crop[3] : img.height;
+  const k = crop ? img.width / (crop[4] || 1024) : 1;   // crop rects are authored for a 1024 px source; reduced variants scale
+  const sx = crop ? Math.round(crop[0] * k) : 0, sy = crop ? Math.round(crop[1] * k) : 0, sw = crop ? Math.round(crop[2] * k) : img.width, sh = crop ? Math.round(crop[3] * k) : img.height;
   const c = document.createElement('canvas');
   c.width = sw; c.height = sh;
   const g = c.getContext('2d');

@@ -76,7 +76,7 @@ export async function create(ctx) {
     if (mode === 'medieval') { try { kitHouses = buildKitHouses(quat, plan.defs || houseDefs || []); } catch (e) { console.warn('[town] medieval kit houses', e); } }
     plan.cc0Houses = useCC0 || kitHouses.size > 0;   // facade dressing made for the generated kit (vines, balconies) is skipped
     const useBatched = ctx.params.get('townBatch') !== '0';
-    const batch = new StaticBatcher(mats, { useBatched });
+    const batch = new StaticBatcher(mats, { useBatched, dropCpu: !!ctx.quality.safe });
     const tmpM = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
     const col = (pal, i) => PALETTE[pal][i % PALETTE[pal].length];
 
@@ -84,6 +84,7 @@ export async function create(ctx) {
     for (const h of plan.houses) {
       const p = piece(h.def.name);
       if (!p) continue;
+      if (ctx.quality.safe >= 2 && Math.hypot(h.x, h.z) > 85) continue;   // safe=2: reduced world (outer districts omitted)
       q.setFromAxisAngle(up, h.yaw);
       tmpM.compose(new THREE.Vector3(h.x, h.floorY, h.z), q, new THREE.Vector3(1, 1, 1));
       const tints = { roof: col('roof', h.tint.roof), plaster: col('plaster', h.tint.plaster), timber: col('timber', h.tint.timber),
@@ -141,7 +142,14 @@ export async function create(ctx) {
 
     batch.build(group);
     api.batch = batch;
+    if (ctx.quality.safe) {
+      // kit pieces and glTF scenes are only needed to assemble the town: release them (decoded copies of ~180 files)
+      allPieces.clear(); quat = null; kitHouses = null;
+      for (const k of Object.keys(kits)) kits[k] = null;
+      ctx.assets.evict?.('assets/free/medieval/'); ctx.assets.evict?.('assets/town/');
+    }
     const cc0Count = useCC0 ? buildCC0Houses(cc0, group, { shadows: ctx.quality.shadows }) : 0;
+    if (ctx.quality.safe) { cc0 = null; ctx.assets.evict?.('assets/cc0/buildings/'); }
 
     // ---------------- streets + plaza
     try {
@@ -175,7 +183,7 @@ export async function create(ctx) {
     try { api.dynamics = createDynamics(ctx, plan, mats, dyn, group); } catch (e) { console.error('[town] dynamics failed', e); }
 
     // LOD swapping (BatchedMesh)
-    const lodDist = ctx.quality.name === 'low' ? 55 : ctx.quality.name === 'medium' ? 80 : 110;
+    const lodDist = ctx.quality.safe ? 40 : ctx.quality.name === 'low' ? 55 : ctx.quality.name === 'medium' ? 80 : 110;
     let acc = 1;
     ctx.updaters.push((dt) => {
       acc += dt;

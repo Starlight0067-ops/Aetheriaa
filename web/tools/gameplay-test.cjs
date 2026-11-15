@@ -2,7 +2,7 @@
 const { chromium, devices } = require('playwright');
 const OUT = '/home/user/Aetheriaa/documentation/screenshots_gameplay/';
 require('fs').mkdirSync(OUT, { recursive: true });
-const URL = 'http://127.0.0.1:5173/';
+const URL = process.env.TEST_URL || 'http://127.0.0.1:5173/';
 const results = []; let errors = [];
 const ok = (name, cond, extra = '') => { results.push([cond ? 'PASS' : 'FAIL', name, extra]); console.log(cond ? 'PASS' : 'FAIL', name, extra); };
 
@@ -128,7 +128,7 @@ async function desktop(browser) {
 
 async function mobile(browser) {
   const dev = devices['iPhone 13 landscape'];
-  const p = await boot(browser, { ...dev }, '?test=1&touch=1&quality=low&nosave=1');
+  const p = await boot(browser, { ...dev }, process.env.MOBILE_QUERY || '?test=1&touch=1&quality=low&nosave=1');
   await step(p, 5);
   const vp = p.viewportSize(); ok('mobile viewport landscape', vp.width > vp.height, JSON.stringify(vp));
   const box = async (sel) => { const b = await (await p.$(sel)).boundingBox(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; };
@@ -148,7 +148,7 @@ async function mobile(browser) {
   ok('touch controls hidden during dialogue', (await p.evaluate(() => getComputedStyle(document.getElementById('touch')).display)) === 'none');
   await step(p, 60); await shot(p, 'movil_dialogo');
   for (let i = 0; i < 30 && (await snap(p)).dialog; i++) { const c = await p.$('#dlg .choices button'); const vis = c && await c.isVisible(); const sel = vis ? '#dlg .choices button' : '#dlg .box'; const b = await box(sel); await p.touchscreen.tap(b.x, b.y); await p.waitForTimeout(80); await step(p, 3); }
-  s = await snap(p); ok('touch: dialogue finishes', !s.dialog && s.quests.mq_awakening.step >= 1);
+  s = await snap(p); ok('touch: dialogue finishes', !s.dialog && s.quests.mq_awakening.step >= 1, JSON.stringify({ d: s.dialog, st: s.quests.mq_awakening }));
   // menus via touch panel
   await tapSel('#touch .tb[aria-label="Menu"]', 1);
   const names = await p.$$eval('#touch .panel .tb', (els) => els.map((e) => e.getAttribute('aria-label')));

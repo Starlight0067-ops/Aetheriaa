@@ -60,9 +60,17 @@ export async function loadKit(ctx, url) {
 
 const _c = new THREE.Color();
 
+/** Free a geometry's CPU arrays right after its buffers are uploaded (static meshes that are never read back). */
+export function dropAfterUpload(geometry) {
+  const drop = function () { this.array = null; };
+  for (const k in geometry.attributes) { const a = geometry.attributes[k]; if (a.usage === THREE.StaticDrawUsage) a.onUpload(drop); }
+  // the index stays: BatchedMesh reads index.array.BYTES_PER_ELEMENT every frame
+}
+
 export class StaticBatcher {
-  constructor(mats, { useBatched = true } = {}) {
+  constructor(mats, { useBatched = true, dropCpu = false } = {}) {
     this.mats = mats;
+    this.dropCpu = dropCpu;       // mobile-safe: free the CPU copy of vertex data once it is on the GPU
     this.useBatched = useBatched;
     this.entries = [];          // { piece, lodPiece, matrix, tints, lodGroup }
     this.objects = [];
@@ -110,12 +118,21 @@ export class StaticBatcher {
       made.castShadow = matName !== 'glow';
       made.receiveShadow = true;
       made.name = 'town_' + matName;
+      if (this.dropCpu) dropAfterUpload(made.geometry);
       scene.add(made);
       this.objects.push(made);
       for (const it of b.list) { const g = it.geo || it.lg; tris += g.index.count / 3; }
     }
     this.tris = tris;
+    this.release();
     return this.objects;
+  }
+
+  /** Forget the kit pieces / source geometries (only matrices + LOD ids are needed from here on). */
+  release() {
+    for (const e of this.entries) { e.piece = null; e.lod = null; }
+    for (const it of this.lodItems || []) { if (it.e) { it.e.piece = null; it.e.lod = null; } }
+    this.entries.length = 0;
   }
 
   _batched(matName, material, b) {
