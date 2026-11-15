@@ -12,3 +12,4 @@ refs/
 # downloaded free packs (re-downloadable; see docs/ASSET_LICENSES.md) and VRM sources already copied to public/
 assets_src/free/
 assets_src/vroid/*.vrm
+dist-lite/
